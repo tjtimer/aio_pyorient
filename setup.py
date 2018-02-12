@@ -2,7 +2,7 @@
 
 #   Copyright 2012 Niko Usai <usai.niko@gmail.com>, http://mogui.it
 #
-#   this file is part of pyorient
+#   this file is part of aio_pyorient
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -18,15 +18,15 @@
 
 from setuptools import setup
 
-setup(name='pyorient',
-    version='1.5.5',
-    author='Niko Usai <mogui83@gmail.com>, Domenico Lupinetti <ostico@gmail.com>',
-    description='OrientDB native client library',
-    long_description=open('README.rst').read(),
-    license='LICENSE',
-    packages = [
-        'pyorient',
-        'pyorient.messages',
-        'pyorient.ogm',
+setup(name='aio_pyorient',
+      version='0.0.1',
+      author='Tim "tjtimer" Jedro <tjtimer@gmail.com>',
+      description='asyncio OrientDB native client library',
+      long_description=open('README.rst').read(),
+      license='LICENSE',
+      packages = [
+          'aio_pyorient',
+          'aio_pyorient.messages',
+          'aio_pyorient.ogm',
     ]
-)
+      )

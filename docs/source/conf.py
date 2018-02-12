@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# pyorient documentation build configuration file, created by
+# aio_pyorient documentation build configuration file, created by
 # sphinx-quickstart on Wed Aug 26 21:27:22 2015.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -11,8 +11,8 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
+import sys
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -40,7 +40,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'pyorient'
+project = u'aio_pyorient'
 copyright = u'2015 mogui, ostico'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -186,7 +186,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'pyorient.tex', u'pyorient Documentation',
+    ('index', 'aio_pyorient.tex', u'aio_pyorient Documentation',
    u'mogui, ostico', 'manual'),
 ]
 
@@ -216,7 +216,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'pyorient', u'pyorient Documentation',
+    ('index', 'aio_pyorient', u'aio_pyorient Documentation',
      [u'mogui, ostico'], 1)
 ]
 
@@ -230,8 +230,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'pyorient', u'pyorient Documentation',
-   u'mogui, ostico', 'pyorient', 'One line description of project.',
+    ('index', 'aio_pyorient', u'aio_pyorient Documentation',
+     u'mogui, ostico', 'aio_pyorient', 'One line description of project.',
    'Miscellaneous'),
 ]
 

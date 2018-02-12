@@ -1,4 +1,4 @@
-pyorient: OrientDB native client library
+aio_pyorient: asyncio OrientDB native client library
 ========================================
 
 .. image:: https://img.shields.io/pypi/v/pyorient.svg
@@ -25,7 +25,7 @@ Installation
 ************
 ::
 
-  pip install pyorient
+  pip install aio_pyorient
 
 
 How to contribute
