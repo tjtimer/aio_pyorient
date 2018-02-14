@@ -7,9 +7,9 @@ from aio_pyorient.exceptions import PyOrientBadMethodCallException, \
 from aio_pyorient.otypes import OrientRecord, OrientRecordLink, OrientNode
 
 from aio_pyorient.hexdump import hexdump
-from aio_pyorient.constants import BOOLEAN, BYTE, BYTES, CHAR, FIELD_BOOLEAN, FIELD_BYTE, \
-    FIELD_INT, FIELD_RECORD, FIELD_SHORT, FIELD_STRING, FIELD_TYPE_LINK, INT, \
-    LINK, LONG, RECORD, SHORT, STRING, STRINGS
+from aio_pyorient.constants import (BOOLEAN, BYTE, BYTES, CHAR, FIELD_BOOLEAN, FIELD_BYTE,
+                                    FIELD_INT, FIELD_RECORD, FIELD_SHORT, FIELD_STRING, FIELD_TYPE_LINK, INT,
+                                    LINK, LONG, RECORD, SHORT, STRING, STRINGS, REQUEST_ERROR)
 from aio_pyorient.sock import OrientSocket
 from aio_pyorient.serializations import OrientSerialization
 
@@ -34,7 +34,6 @@ class BaseMessage(object):
         self._fields_definition = []
         self._command = chr(0)
         self._node_list = []
-        self._output_buffer = b''
         self._input_buffer = b''
         self._callback = None
         self._push_callback = None
@@ -45,96 +44,40 @@ class BaseMessage(object):
         in_transaction = False
 
     @property
-    def _protocol(self):
-        return self._connection.protocol
+    def connected(self):
+        return self._connection.connected
 
     @property
-    def _session_id(self):
+    def session_id(self):
         return self._connection.session_id
 
     @property
-    def _auth_token(self):
+    def auth_token(self):
         return self._connection.auth_token
 
     @property
-    def _db_opened(self):
+    def db_opened(self):
         return self._connection.db_opened
-
-    @property
-    def _connected(self):
-        return self._connection.connected
 
     @property
     def ready(self):
         return self._ready.is_set()
 
     def get_serializer(self):
-        """
-        Lazy return of the serialization, we retrive the type from the :class: `OrientSocket
-        <aio_pyorient.orient.OrientSocket>` object
-        :return: an Instance of the serializer suitable for decoding or encoding
-        """
         if self._connection.serialization_type == OrientSerialization.Binary:
             return OrientSerialization.get_impl(self._connection.serialization_type,
                                                 self._connection._props)
         else:
             return OrientSerialization.get_impl(self._connection.serialization_type)
 
-    def get_orient_socket_instance(self):
-        return self._connection
-
-    def is_connected(self):
-        """Deprecated! Use property connected instead"""
-        return self._connected is True
-
-    @property
-    def connected(self):
-        return self._connection.connected
-
-    def database_opened(self):
-        """Deprecated! Use property db_opened instead"""
-        return self._db_opened
-
-    @property
-    def db_opened(self):
-        return self._db_opened
-
-    def get_cluster_map(self):
-        """:type : list of [OrientNode]"""
-        return self._node_list
-
-
-    def set_session_token( self, token='' ):
-        """
-        :param token: Set the request to True to use the token authentication
-        :type token: bool|string
-        :return: self
-        """
+    async def set_session_token( self, token='' ):
         if token != '' and token is not None:
             if isinstance(token, bool):
                 self._request_token = token
             elif isinstance(token, (str, bytes)):
                 self._request_token = True
-                self._auth_token = token
-                self._db_opened = True
-                self._update_socket_token()
-        return self
-
-    def get_session_token( self ):
-        """
-        Retrieve the session token to reuse after
-        :return:
-        """
-        return self._auth_token
-
-    def _update_socket_id(self):
-        """Force update of socket id from inside the class"""
-        self._connection.session_id = self._session_id
-        return self
-
-    def _update_socket_token(self):
-        """Force update of socket token from inside the class"""
-        self._connection.auth_token = self._auth_token
+                self._connection.auth_token = token
+                self._connection.db_opened = True
         return self
 
     def _reset_fields_definition(self):
@@ -143,7 +86,7 @@ class BaseMessage(object):
     def prepare(self, *args):
 
         # session_id
-        self._fields_definition.insert( 1, ( FIELD_INT, self._session_id ) )
+        self._fields_definition.insert( 1, ( FIELD_INT, self.session_id ) )
 
         """
         #  Token authentication handling
@@ -151,12 +94,9 @@ class BaseMessage(object):
         """
         if self._need_token and self._request_token is True:
             self._fields_definition.insert(
-                2, ( FIELD_STRING, self._auth_token )
+                2, ( FIELD_STRING, self.auth_token )
             )
 
-        self._output_buffer = b''.join(
-            self._encode_field( x ) for x in self._fields_definition
-        )
         return self
 
     @property
@@ -164,35 +104,43 @@ class BaseMessage(object):
         """OrientDb `Binary Protocol` version number, e.g. 37."""
         return self._connection.protocol
 
+    @property
+    def output_buffer(self):
+        return b''.join(
+            self._encode_field( x ) for x in self._fields_definition
+        )
+
+    async def handle_request_error(self):
+        exception_class = b''
+        exception_message = b''
+
+        more = await self._decode_field(FIELD_BOOLEAN)
+
+        while more:
+            # read num bytes by the field definition
+            exception_class += await self._decode_field(FIELD_STRING)
+            exception_message += await self._decode_field(FIELD_STRING)
+            more = await self._decode_field(FIELD_BOOLEAN)
+
+            if self.protocol > 18:  # > 18 1.6-snapshot
+                # read serialized version of exception thrown on server side
+                # useful only for java clients
+                serialized_exception = await self._decode_field(FIELD_STRING)
+                # trash
+                del serialized_exception
+
+        raise PyOrientCommandException(
+            exception_class.decode('utf8'),
+            [exception_message.decode('utf8')]
+        )
+
     async def _decode_header(self):
         self._header = [await self._decode_field(FIELD_BYTE),
                         await self._decode_field(FIELD_INT)]
-        if self._header[0] == 1:
+        if self._header[0] == REQUEST_ERROR:
 
             # Parse the error
-            exception_class = b''
-            exception_message = b''
-
-            more = await self._decode_field(FIELD_BOOLEAN)
-
-            while more:
-                # read num bytes by the field definition
-                exception_class += await self._decode_field(FIELD_STRING)
-                exception_message += await self._decode_field(FIELD_STRING)
-                more = await self._decode_field(FIELD_BOOLEAN)
-
-                if self.protocol > 18:  # > 18 1.6-snapshot
-                    # read serialized version of exception thrown on server side
-                    # useful only for java clients
-                    serialized_exception = await self._decode_field(FIELD_STRING)
-                    # trash
-                    del serialized_exception
-
-            raise PyOrientCommandException(
-                exception_class.decode( 'utf8' ),
-                [ exception_message.decode( 'utf8' ) ]
-            )
-
+            await self.handle_request_error()
         elif self._header[0] == 3:
             # Push notification, Node cluster changed
             # TODO: UNTESTED CODE!!!
@@ -238,7 +186,7 @@ class BaseMessage(object):
             token_refresh = await self._decode_field(FIELD_STRING)
             print(f"token_refresh: {token_refresh}")
             if token_refresh != b'':
-                self._auth_token = token_refresh
+                self._connection.auth_token = token_refresh
                 self._update_socket_token()
 
     async def _decode_body(self):
@@ -285,7 +233,7 @@ class BaseMessage(object):
 
     async def send(self):
         if self._connection.in_transaction is False:
-            await self._connection.write(self._output_buffer)
+            await self._connection.write(self.output_buffer)
             self._reset_fields_definition()
         return self
 
@@ -475,8 +423,6 @@ class BaseMessage(object):
                 )
             )
 
-        # self.dump_streams()  # debug log
-        self._output_buffer = b''
         self._input_buffer = b''
 
         return res

@@ -1,66 +1,18 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime
+
 from aio_pyorient.constants import (COMMAND_OP, FIELD_BOOLEAN, FIELD_BYTE, FIELD_CHAR, FIELD_INT, FIELD_LONG,
                                     FIELD_SHORT, FIELD_STRING, QUERY_ASYNC, QUERY_CMD, QUERY_GREMLIN, QUERY_SCRIPT,
                                     QUERY_SYNC, QUERY_TYPES, TX_COMMIT_OP)
 from aio_pyorient.exceptions import PyOrientBadMethodCallException
 from aio_pyorient.messages.base import BaseMessage
 from aio_pyorient.messages.records import (RecordCreateMessage, RecordDeleteMessage, RecordUpdateMessage)
-from aio_pyorient.utils import need_connected, need_db_opened
 
 
-#
-# COMMAND_OP
-#
-# Executes remote commands:
-#
-# Request: (mode:byte)(class-name:string)(command-payload-length:int)(command-payload)
-# Response:
-# - synchronous commands: [(synch-result-type:byte)[(synch-result-content:?)]]+
-# - asynchronous commands: [(asynch-result-type:byte)[(asynch-result-content:?)]*]
-#   (pre-fetched-record-size.md)[(pre-fetched-record)]*+
-#
-# Where the request:
-#
-# mode can be 'a' for asynchronous mode and 's' for synchronous mode
-# class-name is the class name of the command implementation.
-#   There are short form for the most common commands:
-# q stands for query as idempotent command. It's like passing
-#   com.orientechnologies.orient.core.sql.query.OSQLSynchQuery
-# c stands for command as non-idempotent command (insert, update, etc).
-#   It's like passing com.orientechnologies.orient.core.sql.OCommandSQL
-# s stands for script. It's like passing
-#   com.orientechnologies.orient.core.command.script.OCommandScript.
-#   Script commands by using any supported server-side scripting like Javascript command. Since v1.0.
-# any other values is the class name. The command will be created via
-#   reflection using the default constructor and invoking the fromStream() method against it
-# command-payload is the command's serialized payload (see Network-Binary-Protocol-Commands)
-
-# Response is different for synchronous and asynchronous request:
-# synchronous:
-# synch-result-type can be:
-# 'n', means null result
-# 'r', means single record returned
-# 'l', collection of records. The format is:
-# an integer to indicate the collection size
-# all the records one by one
-# 'a', serialized result, a byte[] is sent
-# synch-result-content, can only be a record
-# pre-fetched-record-size, as the number of pre-fetched records not
-#   directly part of the result set but joined to it by fetching
-# pre-fetched-record as the pre-fetched record content
-# asynchronous:
-# asynch-result-type can be:
-# 0: no records remain to be fetched
-# 1: a record is returned as a resultset
-# 2: a record is returned as pre-fetched to be loaded in client's cache only.
-#   It's not part of the result set but the client knows that it's available for later access
-# asynch-result-content, can only be a record
-#
 class CommandMessage(BaseMessage):
 
     def __init__(self, _orient_socket):
         super().__init__(_orient_socket)
-
         self._query = ''
         self._limit = 20
         self._fetch_plan = '*:0'
@@ -69,12 +21,18 @@ class CommandMessage(BaseMessage):
 
         self._append( ( FIELD_BYTE, COMMAND_OP ) )
 
-    @need_db_opened
     def prepare(self, params=None ):
 
-        if isinstance( params, tuple ) or isinstance( params, list ):
+        if isinstance(params, (tuple, list)):
+            command_type = params[0]
             try:
-                self.set_command_type( params[0] )
+                if command_type in QUERY_TYPES:
+                    # user choice if present
+                    self._command_type = command_type
+                else:
+                    raise PyOrientBadMethodCallException(
+                        command_type + ' is not a valid command type', []
+                    )
 
                 self._query = params[1]
                 self._limit = params[2]
@@ -144,32 +102,8 @@ class CommandMessage(BaseMessage):
         else:
             return await self._read_sync()
 
-    def set_command_type(self, _command_type):
-        if _command_type in QUERY_TYPES:
-            # user choice if present
-            self._command_type = _command_type
-        else:
-            raise PyOrientBadMethodCallException(
-                _command_type + ' is not a valid command type', []
-            )
-        return self
-
-    def set_fetch_plan(self, _fetch_plan):
-        self._fetch_plan = _fetch_plan
-        return self
-
-    def set_query(self, _query):
-        self._query = _query
-        return self
-
-    def set_limit(self, _limit):
-        self._limit = _limit
-        return self
-
     async def _read_sync(self):
 
-        # type of response
-        # decode body char with flag continue ( Header already read )
         response_type = await self._decode_field(FIELD_CHAR)
         if not isinstance(response_type, str):
             response_type = response_type.decode()
@@ -177,13 +111,11 @@ class CommandMessage(BaseMessage):
         if response_type == 'n':
             self._append( FIELD_CHAR )
             await super().fetch_response(True)
-            # end Line \x00
             return None
-        elif response_type == 'r' or response_type == 'w':
+        elif response_type in 'rw':
             res = [await self._read_record()]
             self._append( FIELD_CHAR )
-            # end Line \x00
-            _res = await super().fetch_response(True)
+            await super().fetch_response(True)
             if response_type == 'w':
                 res = [ res[0].oRecordData['result'] ]
         elif response_type == 'a':
@@ -223,50 +155,7 @@ class CommandMessage(BaseMessage):
             raise PyOrientBadMethodCallException( func + " is not a callable "
                                                          "function", [])
         return self
-#
-# TX COMMIT
-#
-# Commits a transaction. This operation flushes all the
-#   pending changes to the server side.
-#
-# Request: (tx-id:int)(using-tx-log:byte)(tx-entry)*(0-byte indicating end-of-records)
 
-#   tx-entry: (operation-type:byte)(cluster-id:short)
-#       (cluster-position:long)(record-type:byte)(entry-content)
-#
-#     entry-content for CREATE: (record-content:bytes)
-#     entry-content for UPDATE: (version:record-version)(content-changed:boolean)(record-content:bytes)
-#     entry-content for DELETE: (version:record-version)
-
-# Response: (created-record-count:int)[(client-specified-cluster-id:short)
-#   (client-specified-cluster-position:long)(created-cluster-id:short)
-#   (created-cluster-position:long)]*(updated-record-count:int)[(updated-cluster-id:short)
-#   (updated-cluster-position:long)(new-record-version:int)]*(count-of-collection-changes:int)
-#   [(uuid-most-sig-bits:long)(uuid-least-sig-bits:long)(updated-file-id:long)(updated-page-index:long)
-#   (updated-page-offset:int)]*
-#
-# Where:
-# tx-id is the Transaction's Id
-# use-tx-log tells if the server must use the Transaction
-#   Log to recover the transaction. 1 = true, 0 = false
-# operation-type can be:
-# 1, for UPDATES
-# 2, for DELETES
-# 3, for CREATIONS
-#
-# record-content depends on the operation type:
-# For UPDATED (1): (original-record-version:int)(record-content:bytes)
-# For DELETED (2): (original-record-version:int)
-# For CREATED (3): (record-content:bytes)
-#
-# This response contains two parts: a map of 'temporary' client-generated
-#   record ids to 'real' server-provided record ids for each CREATED record,
-#   and a map of UPDATED record ids to update record-versions.
-#
-# Look at Optimistic Transaction to know how temporary RecordIDs are managed.
-#
-# The last part or response is referred to RidBag management.
-#   Take a look at the main page for more details.
 class _TXCommitMessage(BaseMessage):
     def __init__(self, _orient_socket):
         super().__init__(_orient_socket)
@@ -282,7 +171,6 @@ class _TXCommitMessage(BaseMessage):
         self._append(( FIELD_BYTE, TX_COMMIT_OP ))
         self._command = TX_COMMIT_OP
 
-    @need_connected
     def prepare(self, params=None):
 
         self._append(( FIELD_INT, self.get_transaction_id() ))
@@ -298,12 +186,7 @@ class _TXCommitMessage(BaseMessage):
 
         return super().prepare()
 
-    async def send(self):
-        return super().send()
-
     async def fetch_response(self):
-        # self.dump_streams()
-
         await super().fetch_response()
 
         result = {
@@ -314,13 +197,6 @@ class _TXCommitMessage(BaseMessage):
 
         items = await self._decode_field(FIELD_INT)
         for x in range(0, items):
-            # (created-record-count:int)
-            # [
-            # (client-specified-cluster-id:short)
-            #     (client-specified-cluster-position:long)
-            #     (created-cluster-id:short)
-            #     (created-cluster-position:long)
-            # ]*
             result['created'].append(
                 {
                     'client_c_id': await self._decode_field(FIELD_SHORT),
@@ -344,13 +220,6 @@ class _TXCommitMessage(BaseMessage):
 
         items = await self._decode_field(FIELD_INT)
         for x in range(0, items):
-
-            # (updated-record-count:int)
-            # [
-            # (updated-cluster-id:short)
-            #     (updated-cluster-position:long)
-            #     (new-record-version:int)
-            # ]*
             result['updated'].append(
                 {
                     'updated_c_id': await self._decode_field(FIELD_SHORT),
@@ -379,14 +248,6 @@ class _TXCommitMessage(BaseMessage):
         if self.protocol > 23:
             items = await self._decode_field(FIELD_INT)
             for x in range(0, items):
-                # (count-of-collection-changes:int)
-                # [
-                # (uuid-most-sig-bits:long)
-                #     (uuid-least-sig-bits:long)
-                #     (updated-file-id:long)
-                #     (updated-page-index:long)
-                #     (updated-page-offset:int)
-                # ]*
                 result['updated'].append(
                     {
                         'uuid_high': await self._decode_field(FIELD_LONG),
@@ -397,11 +258,9 @@ class _TXCommitMessage(BaseMessage):
                     }
                 )
 
-        # self.dump_streams()
+        return self._operation_records
 
-        return self._operation_records #  [self._operation_records, result]
-
-    def attach(self, operation):
+    async def attach(self, operation):
 
         if not isinstance(operation, BaseMessage):
             # A Subclass of BaseMessage was expected
@@ -455,10 +314,9 @@ class _TXCommitMessage(BaseMessage):
 
         return self
 
-    def get_transaction_id(self):
+    async def get_transaction_id(self):
 
         if self._tx_id < 0:
-            from datetime import datetime
 
             my_epoch = datetime(2014, 7, 1)
             now = datetime.now()
@@ -483,18 +341,20 @@ class _TXCommitMessage(BaseMessage):
 
         return self._tx_id
 
-    def begin(self):
+    async def begin(self):
         self._operation_stack = []
         self._pre_operation_records = {}
         self._operation_records = {}
         self._temp_cluster_position_seq = -2
         self._connection.in_transaction = True
-        self.get_transaction_id()
+        await self.get_transaction_id()
         return self
 
     async def commit(self):
         self._connection.in_transaction = False
-        result = await self.execute()
+        request = self.prepare(())
+        await request.send()
+        result = await request.fetch_response()
         self._operation_stack = []
         self._pre_operation_records = {}
         self._operation_records = {}
@@ -531,9 +391,4 @@ class TxCommitMessage:
     async def commit(self):
         return await self._transaction.commit()
 
-    def rollback(self):
-        return self._transaction.rollback()
 
-    def set_session_token(self, token):
-        self._transaction.set_session_token(token)
-        return self

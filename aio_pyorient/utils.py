@@ -2,12 +2,8 @@ import asyncio
 import functools
 import typing
 
-__author__ = 'Ostico <ostico@gmail.com>'
-
 import os
 import sys
-from aio_pyorient.exceptions import PyOrientConnectionException, \
-    PyOrientDatabaseException
 from aio_pyorient.otypes import OrientRecordLink
 
 
@@ -56,63 +52,6 @@ class AsyncObject(object):
             return task.cancel()
         return task.done()
 
-def is_debug_active():
-    if 'DEBUG' in os.environ:
-        if os.environ['DEBUG'].lower() in ( '1', 'true' ):
-            return True
-    return False
-
-
-def is_debug_verbose():
-    if 'DEBUG_VERBOSE' in os.environ:
-        if is_debug_active() and os.environ['DEBUG_VERBOSE'].lower() \
-                in ( '1', 'true' ):
-            return True
-    return False
-
-
-def dlog( msg ):
-    # add check for DEBUG key because KeyError Exception is not caught
-    # and if no DEBUG key is set, the driver crash with no reason when
-    # connection starts
-    if is_debug_active():
-        print("[DEBUG]:: %s" % msg)
-
-
-class Singleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-#
-# need connection decorator
-def need_connected(wrap):
-    def wrap_function(*args, **kwargs):
-        if not args[0].is_connected():
-            raise PyOrientConnectionException(
-                "You must be connected to issue this command", [])
-        return wrap(*args, **kwargs)
-
-    return wrap_function
-
-
-#
-# need db opened decorator
-def need_db_opened(wrap):
-    @need_connected
-    def wrap_function(*args, **kwargs):
-        if args[0].database_opened() is None:
-            raise PyOrientDatabaseException(
-                "You must have an opened database to issue this command", [])
-        return wrap(*args, **kwargs)
-
-    return wrap_function
-
-
 def parse_cluster_id(cluster_id):
     try:
 
@@ -124,8 +63,6 @@ def parse_cluster_id(cluster_id):
             cluster_id = cluster_id.decode("utf-8")
         elif isinstance( cluster_id, OrientRecordLink ):
             cluster_id = cluster_id.get()
-        elif sys.version_info[0] < 3 and isinstance( cluster_id, unicode ):
-            cluster_id = cluster_id.encode('utf-8')
 
         _cluster_id, _position = cluster_id.split( ':' )
         if _cluster_id[0] is '#':
@@ -156,23 +93,11 @@ def parse_cluster_position(_cluster_position):
         _position = _cluster_position
     return _position
 
-if sys.version < '3':
-    import codecs
+def u(x):
+    return x
 
-    def u(x):
-        return codecs.unicode_escape_decode(x)[0]
+def to_str(x):
+    return str(x)
 
-    def to_unicode(x):
-        return str(x).decode('utf-8')
-
-    def to_str(x):
-        return unicode(x).encode('utf-8')
-else:
-    def u(x):
-        return x
-
-    def to_str(x):
-        return str(x)
-
-    def to_unicode(x):
-        return str(x)
+def to_unicode(x):
+    return str(x)

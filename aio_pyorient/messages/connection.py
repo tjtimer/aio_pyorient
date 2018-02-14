@@ -1,7 +1,6 @@
 from aio_pyorient.constants import (CONNECT_OP, FIELD_BOOLEAN, FIELD_BYTE, FIELD_INT, FIELD_SHORT, FIELD_STRING,
                                     FIELD_STRINGS, NAME, SHUTDOWN_OP, SUPPORTED_PROTOCOL, VERSION)
 from aio_pyorient.messages.base import BaseMessage
-from aio_pyorient.utils import need_connected
 
 
 class ConnectMessage(BaseMessage):
@@ -15,16 +14,14 @@ class ConnectMessage(BaseMessage):
         self._need_token = False
         self._append( ( FIELD_BYTE, CONNECT_OP ) )
 
-    def prepare(self, params=None ):
+    def prepare(self, params=None):
 
-        if isinstance( params, tuple ) or isinstance( params, list ):
+        if isinstance(params, (tuple, list)):
             try:
                 self._user = params[0]
                 self._pass = params[1]
                 self._client_id = params[2]
-
             except IndexError:
-                # Use default for non existent indexes
                 pass
 
         self._append( ( FIELD_STRINGS, [NAME, VERSION] ) )
@@ -53,27 +50,14 @@ class ConnectMessage(BaseMessage):
         result = await super().fetch_response()
 
         # IMPORTANT needed to pass the id to other messages
-        self._session_id = result[0]
-        self._update_socket_id()
+        self._connection.session_id = result[0]
 
         if self.protocol > 26:
             if result[1] is None:
-                self.set_session_token( False )
+                self._request_token = False
             self.set_session_token(result[1])
 
-        return self._session_id
-
-    def set_user(self, _user):
-        self._user = _user
-        return self
-
-    def set_pass(self, _pass):
-        self._pass = _pass
-        return self
-
-    def set_client_id(self, _cid):
-        self._client_id = _cid
-        return self
+        return self.session_id
 
 
 class ShutdownMessage(BaseMessage):

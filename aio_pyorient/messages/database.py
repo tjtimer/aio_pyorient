@@ -6,7 +6,6 @@ from aio_pyorient.constants import (DB_CLOSE_OP, DB_COUNT_RECORDS_OP, DB_CREATE_
 from aio_pyorient.exceptions import PyOrientBadMethodCallException
 from aio_pyorient.messages.base import BaseMessage
 from aio_pyorient.otypes import OrientCluster, OrientNode, OrientRecord, OrientVersion
-from aio_pyorient.utils import need_connected, need_db_opened
 
 
 class DbOpenMessage(BaseMessage):
@@ -66,15 +65,11 @@ class DbOpenMessage(BaseMessage):
 
         result = await super().fetch_response()
         if self.protocol > 26:
-            self._session_id, self._auth_token, cluster_num = result
-            if self._auth_token == b'':
+            self._connection.session_id, self._connection.auth_token, cluster_num = result
+            if self.auth_token == b'':
                 self.set_session_token(False)
-            self._update_socket_token()
         else:
-            self._session_id, cluster_num = result
-
-        # IMPORTANT needed to pass the id to other messages
-        self._update_socket_id()
+            self._connection.session_id, cluster_num = result
 
         clusters = []
 
@@ -102,9 +97,6 @@ class DbOpenMessage(BaseMessage):
         # parsing server release version
         info = OrientVersion(release)
 
-        nodes = []
-
-        # parsing Node List TODO: this must be put in serialization interface
         if len(nodes_config) > 0:
             _, decoded = self.get_serializer().decode(nodes_config)
             self._node_list = []

@@ -1,12 +1,11 @@
 import asyncio
-import socket
 import struct
 
 from aio_pyorient.constants import (
     FIELD_SHORT,
     SUPPORTED_PROTOCOL
 )
-from aio_pyorient.exceptions import (PyOrientConnectionException, PyOrientConnectionPoolException,
+from aio_pyorient.exceptions import (PyOrientConnectionPoolException,
                                      PyOrientWrongProtocolVersionException)
 from aio_pyorient.serializations import OrientSerialization
 
