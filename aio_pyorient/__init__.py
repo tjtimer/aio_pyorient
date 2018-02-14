@@ -1,2 +1,3 @@
 from .client import OrientDB
-from .sock import OrientSocket
+
+__all__ = ('OrientDB',)

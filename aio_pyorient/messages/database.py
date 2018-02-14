@@ -1,55 +1,23 @@
-# -*- coding: utf-8 -*-
-__author__ = 'Ostico <ostico@gmail.com>'
-
 from aio_pyorient.constants import (DB_CLOSE_OP, DB_COUNT_RECORDS_OP, DB_CREATE_OP, DB_DROP_OP, DB_EXIST_OP, DB_LIST_OP,
-                                    DB_OPEN_OP, DB_RELOAD_OP, DB_SIZE_OP, DB_TYPES, DB_TYPE_DOCUMENT, FIELD_BOOLEAN,
-                                    FIELD_BYTE, FIELD_BYTES, FIELD_INT, FIELD_LONG, FIELD_SHORT, FIELD_STRING,
-                                    FIELD_STRINGS, NAME, STORAGE_TYPES, STORAGE_TYPE_LOCAL, STORAGE_TYPE_PLOCAL,
-                                    SUPPORTED_PROTOCOL, VERSION)
+                                    DB_OPEN_OP, DB_RELOAD_OP, DB_SIZE_OP, DB_TYPES, DB_TYPE_DOCUMENT, DB_TYPE_GRAPH,
+                                    FIELD_BOOLEAN, FIELD_BYTE, FIELD_BYTES, FIELD_INT, FIELD_LONG, FIELD_SHORT,
+                                    FIELD_STRING, FIELD_STRINGS, NAME, STORAGE_TYPES, STORAGE_TYPE_LOCAL,
+                                    STORAGE_TYPE_PLOCAL, SUPPORTED_PROTOCOL, VERSION)
 from aio_pyorient.exceptions import PyOrientBadMethodCallException
 from aio_pyorient.messages.base import BaseMessage
 from aio_pyorient.otypes import OrientCluster, OrientNode, OrientRecord, OrientVersion
 from aio_pyorient.utils import need_connected, need_db_opened
 
 
-#
-# DB OPEN
-#
-# This is the first operation the client should call.
-# It opens a database on the remote OrientDB Server.
-# Returns the Session-Id to being reused for all the next calls and
-# the list of configured clusters.
-#
-# Request: (driver-name:string)(driver-version:string)
-#   (protocol-version:short)(client-id:string)(serialization-impl:string)
-#   (database-name:string)(database-type:string)(user-name:string)(user-password:string)
-# Response:(session-id:int)(num-of-clusters:short)[(cluster-name:string)
-#   (cluster-id:short)](cluster-config:bytes.md)(orientdb-release:string)
-#
-# client's driver-name as string. Example: "OrientDB Java client"
-# client's driver-version as string. Example: "1.0rc8-SNAPSHOT"
-# client's protocol-version as short. Example: 7
-# client's client-id as string. Can be null for clients. In clustered configuration
-#   is the distributed node ID as TCP host+port. Example: "10.10.10.10:2480"
-# client's serialization-impl the serialization format required by the client.
-# database-name as string. Example: "demo"
-# database-type as string, can be 'document' or 'graph' (since version 8). Example: "document"
-# user-name as string. Example: "admin"
-# user-password as string. Example: "admin"
-# cluster-config is always null unless you're running in a server clustered configuration.
-# orientdb-release as string. Contains version of OrientDB release
-#   deployed on server and optionally build number. Example: "1.4.0-SNAPSHOT (build 13)"
-#
-#
 class DbOpenMessage(BaseMessage):
     def __init__(self, _orient_socket):
-        super(DbOpenMessage, self).__init__(_orient_socket)
+        super().__init__(_orient_socket)
 
         self._user = ''
         self._pass = ''
         self._client_id = ''
         self._db_name = ''
-        self._db_type = DB_TYPE_DOCUMENT
+        self._db_type = DB_TYPE_GRAPH
         self._append(( FIELD_BYTE, DB_OPEN_OP ))
         self._need_token = False
 

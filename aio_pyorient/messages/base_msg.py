@@ -13,7 +13,6 @@ from aio_pyorient.constants import BOOLEAN, BYTE, BYTES, CHAR, FIELD_BOOLEAN, FI
 from aio_pyorient.sock import OrientSocket
 from aio_pyorient.serializations import OrientSerialization
 
-
 class BaseMessage(object):
     _name = None
 

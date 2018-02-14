@@ -1,12 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-@author: Ostico <ostico@gmail.com>
-"""
 import asyncio
+from pprint import pprint
 
 try:
     import uvloop
-
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 except ImportError:
     pass
@@ -101,18 +97,12 @@ class OrientDB(object):
                  loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()):
         self._loop = loop
         self._connection = OrientSocket(
-            host, port,
+            host=host, port=port,
             serialization_type=serialization_type, loop=self._loop
         )
         self._serialization_type = serialization_type
-        #: an :class:`OrientVersion <OrientVersion>` object representing connected server version, None if
-        #: not connected
         self.version = None
-
-        #: array of :class:`OrientCluser <OrientCluser>` representing the connected database clusters
         self.clusters = []
-
-        #: array of :class:`OrientNode <OrientNode>` if the connected server is in a distributed cluster config
         self.nodes = []
 
     @property
@@ -149,15 +139,19 @@ class OrientDB(object):
         """
         return self._connection.auth_token
 
-    # SERVER COMMANDS
-
     async def connect(self, user, password, client_id=''):
         await self._connection.get_connection()
         request = ConnectMessage(self._connection).prepare(
-            (user, password, client_id, self._serialization_type)
+            (user, password, client_id, self.serialization_type)
         )
         await request.send()
         response = await request.fetch_response()
+        print("client connect response")
+        print(response)
+        print("client vars")
+        pprint(vars(self))
+        print("client connection vars")
+        pprint(vars(self._connection))
         return response
 
     async def db_count_records(self):
@@ -188,13 +182,12 @@ class OrientDB(object):
     async def db_open(self,
                       db_name, user, password,
                       db_type=DB_TYPE_GRAPH, client_id=''):
+        await self._connection.get_connection()
         request = DbOpenMessage(self._connection).prepare(
             (db_name, user, password, db_type, client_id))
         await request.send()
-        info, clusters, nodes = await request.fetch_response()
-        self.version = info
-        self.clusters = clusters
-        self.nodes = nodes
+        response = await request.fetch_response()
+        self.version, self.clusters, self.nodes = response
         await self.update_properties()
         return self.clusters
 
@@ -206,7 +199,7 @@ class OrientDB(object):
         return self.clusters
 
     async def update_properties(self):
-        if self._serialization_type == OrientSerialization.Binary:
+        if self.serialization_type == OrientSerialization.Binary:
             self._connection._props = {
                 x['id']: [x['name'], type_map[x['type']]]
                 for x in await self.command(
@@ -219,8 +212,6 @@ class OrientDB(object):
         await request.send()
         response = await request.fetch_response()
         return response
-
-    # DATABASE COMMANDS
 
     async def gremlin(self, *args):
         request = CommandMessage(self._connection).prepare(
@@ -336,7 +327,7 @@ class OrientDB(object):
     async def tx_commit(self):
         return TxCommitMessage(self._connection)
 
-    def _push_received(self, command_id, payload):
+    def _push_received(self, command_id, *args):
         # REQUEST_PUSH_RECORD	        79
         # REQUEST_PUSH_DISTRIB_CONFIG	80
         # REQUEST_PUSH_LIVE_QUERY	    81

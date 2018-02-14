@@ -1,16 +1,9 @@
-__author__ = 'Ostico <ostico@gmail.com>'
-
 from aio_pyorient.constants import (CONNECT_OP, FIELD_BOOLEAN, FIELD_BYTE, FIELD_INT, FIELD_SHORT, FIELD_STRING,
                                     FIELD_STRINGS, NAME, SHUTDOWN_OP, SUPPORTED_PROTOCOL, VERSION)
 from aio_pyorient.messages.base import BaseMessage
 from aio_pyorient.utils import need_connected
 
 
-#from ..serializations import OrientSerialization
-
-#
-# Connect
-#
 class ConnectMessage(BaseMessage):
 
     def __init__(self, _orient_socket):
@@ -66,8 +59,7 @@ class ConnectMessage(BaseMessage):
         if self.protocol > 26:
             if result[1] is None:
                 self.set_session_token( False )
-            self._auth_token = result[1]
-            self._update_socket_token()
+            self.set_session_token(result[1])
 
         return self._session_id
 
@@ -84,10 +76,6 @@ class ConnectMessage(BaseMessage):
         return self
 
 
-
-#
-# Shutdown
-#
 class ShutdownMessage(BaseMessage):
 
     def __init__(self, _orient_socket ):

@@ -1,14 +1,12 @@
-import asyncio
-
-from aio_pyorient import OrientDB
-
-
-def test_connect():
-    loop = asyncio.get_event_loop()
-    client = OrientDB(loop=loop)
-    session_id = loop.run_until_complete(
-        client.connect(
-            "root", "orient-pw"
-        )
-    )
+async def test_connect(client):
+    session_id = await client.connect("root", "orient-pw")
     assert session_id >= 0
+
+async def test_db_open(client):
+    info, clusters, node_list = await client.db_open(
+        "tjs-test", "root", "orient-pw"
+    )
+    assert info is not None
+    assert len(clusters) > 0
+    assert len(node_list) > 0
+
