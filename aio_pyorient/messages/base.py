@@ -2,16 +2,14 @@ import asyncio
 import struct
 import sys
 
-from aio_pyorient.exceptions import PyOrientBadMethodCallException, \
-    PyOrientCommandException, PyOrientNullRecordException
-from aio_pyorient.otypes import OrientRecord, OrientRecordLink, OrientNode
-
-from aio_pyorient.hexdump import hexdump
-from aio_pyorient.constants import (BOOLEAN, BYTE, BYTES, CHAR, FIELD_BOOLEAN, FIELD_BYTE,
-                                    FIELD_INT, FIELD_RECORD, FIELD_SHORT, FIELD_STRING, FIELD_TYPE_LINK, INT,
-                                    LINK, LONG, RECORD, SHORT, STRING, STRINGS, REQUEST_ERROR)
-from aio_pyorient.sock import OrientSocket
+from aio_pyorient.constants import (BOOLEAN, BYTE, BYTES, CHAR, FIELD_BOOLEAN, FIELD_BYTE, FIELD_INT, FIELD_RECORD,
+                                    FIELD_SHORT, FIELD_STRING, FIELD_TYPE_LINK, INT, LINK, LONG, RECORD, REQUEST_ERROR,
+                                    SHORT, STRING, STRINGS)
+from aio_pyorient.exceptions import (PyOrientBadMethodCallException,
+                                     PyOrientCommandException, PyOrientNullRecordException)
+from aio_pyorient.otypes import OrientNode, OrientRecord, OrientRecordLink
 from aio_pyorient.serializations import OrientSerialization
+from aio_pyorient.sock import OrientSocket
 
 
 class BaseMessage(object):
@@ -70,7 +68,7 @@ class BaseMessage(object):
         else:
             return OrientSerialization.get_impl(self._connection.serialization_type)
 
-    async def set_session_token( self, token='' ):
+    def set_session_token( self, token='' ):
         if token != '' and token is not None:
             if isinstance(token, bool):
                 self._request_token = token
@@ -88,10 +86,6 @@ class BaseMessage(object):
         # session_id
         self._fields_definition.insert( 1, ( FIELD_INT, self.session_id ) )
 
-        """
-        #  Token authentication handling
-        #  we must recognize ConnectMessage and DbOpenMessage messages
-        """
         if self._need_token and self._request_token is True:
             self._fields_definition.insert(
                 2, ( FIELD_STRING, self.auth_token )
@@ -127,7 +121,7 @@ class BaseMessage(object):
                 # useful only for java clients
                 serialized_exception = await self._decode_field(FIELD_STRING)
                 # trash
-                del serialized_exception
+                # print(serialized_exception)
 
         raise PyOrientCommandException(
             exception_class.decode('utf8'),
@@ -180,19 +174,18 @@ class BaseMessage(object):
             self._header[1] = await self._decode_field(FIELD_INT)  # REAL SESSION ID
             pass
 
-        update_token = self._name in "ConnectMessage, DbOpenMessage" and self._request_token is True
-        print("update token: ", update_token)
-        if update_token:
+        is_entry = self._name in "ConnectMessage, DbOpenMessage"
+        if is_entry and self._request_token is True:
             token_refresh = await self._decode_field(FIELD_STRING)
-            print(f"token_refresh: {token_refresh}")
             if token_refresh != b'':
                 self._connection.auth_token = token_refresh
-                self._update_socket_token()
 
     async def _decode_body(self):
         # read body
         for field in self._fields_definition:
-            self._body.append(await self._decode_field(field))
+            value = await self._decode_field(field)
+            # # print(f"{self._name} response value: {value}")
+            self._body.append(value)
 
         # clear field stack
         self._reset_fields_definition()
@@ -217,6 +210,7 @@ class BaseMessage(object):
         elif len(self._body) is 0:
             await self._decode_all()
             # self.dump_streams()
+            # print(f"""base body decoded: {field for field in self._body}""")
         return self._body
 
     def _append(self, field):
@@ -232,9 +226,9 @@ class BaseMessage(object):
         return f"<{self._name} ready={self.ready}"
 
     async def send(self):
-        if self._connection.in_transaction is False:
+        if not self._connection.in_transaction:
             await self._connection.write(self.output_buffer)
-            self._reset_fields_definition()
+            self._fields_definition = []
         return self
 
     def close(self):
@@ -246,59 +240,38 @@ class BaseMessage(object):
         # tuple with type
         t, v = field
         _content = None
-        print(t, v)
+        # print(t, v)
         if t['type'] == INT:
-            _content = struct.pack("!i", v)
+            _content = struct.pack(">i", v)
         elif t['type'] == SHORT:
-            _content = struct.pack("!h", v)
+            _content = struct.pack(">h", v)
         elif t['type'] == LONG:
-            _content = struct.pack("!q", v)
+            _content = struct.pack(">q", v)
         elif t['type'] == BOOLEAN:
-            if sys.version_info[0] < 3:
-                _content = chr(1) if v else chr(0)
-            else:
-                _content = bytes([1]) if v else bytes([0])
+            _content = bytes([1]) if v else bytes([0])
         elif t['type'] == BYTE:
-            if sys.version_info[0] < 3:
-                _content = v
-            else:
-                _content = bytes([ord(v)])
+            _content = bytes([ord(v)])
         elif t['type'] == BYTES:
-            _content = struct.pack("!i", len(v)) + v
+            _content = struct.pack(">i", len(v)) + v
         elif t['type'] == STRING:
-            if sys.version_info[0] >= 3:
-                if isinstance(v, str):
-                    v = v.encode('utf-8')
-            else:
-                if isinstance(v, unicode):
-                    v = v.encode('utf-8')
-            _content = struct.pack("!i", len(v)) + v
+            v = v.encode('utf-8') if isinstance(v, str) else v
+            _content = struct.pack(">i", len(v)) + v
         elif t['type'] == STRINGS:
             _content = b''
             for s in v:
-                if sys.version_info[0] >= 3:
-                    if isinstance(s, str):
-                        s = s.encode('utf-8')
-                else:
-                    if isinstance(s, unicode):
-                        s = s.encode('utf-8')
-                _content += struct.pack("!i", len(s)) + s
-        print(f"{t['type']} encoded: {_content}")
+                s = s.encode('utf-8') if isinstance(s, str) else s
+                _content += struct.pack(">i", len(s)) + s
+        # print(f"{t['type']} encoded: {_content}")
         return _content
 
     async def _decode_field(self, _type):
         _value = b""
-        # read buffer length and decode value by field definition
         if _type['bytes'] is not None:
             _value = await self._connection.read(_type['bytes'])
-        print(f"OrientSocket read type: {_type}")
-        print(f"OrientSocket read type: {_value}")
-        # if it is a string decode first 4 Bytes as INT
-        # and try to read the buffer
-        if _type['type'] == STRING or _type['type'] == BYTES:
+        if _type['type'] in [STRING, BYTES]:
 
-            _len = struct.unpack('!i', _value)[0]
-            if _len == -1 or _len == 0:
+            _len = struct.unpack('>i', _value)[0]
+            if _len <= 0:
                 _decoded_string = b''
             else:
                 _decoded_string = await self._connection.read(_len)
@@ -331,17 +304,17 @@ class BaseMessage(object):
             self._input_buffer += _value
 
             if _type['type'] == BOOLEAN:
-                return ord(_value) == 1
+                return ord(_value) is 1
             elif _type['type'] == BYTE:
                 return ord(_value)
             elif _type['type'] == CHAR:
                 return _value
             elif _type['type'] == SHORT:
-                return struct.unpack('!h', _value)[0]
+                return struct.unpack('>h', _value)[0]
             elif _type['type'] == INT:
-                return struct.unpack('!i', _value)[0]
+                return struct.unpack('>i', _value)[0]
             elif _type['type'] == LONG:
-                return struct.unpack('!q', _value)[0]
+                return struct.unpack('>q', _value)[0]
 
     async def _read_async_records(self):
         """

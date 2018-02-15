@@ -47,15 +47,15 @@ class ConnectMessage(BaseMessage):
         self._append( FIELD_INT )
         if self.protocol > 26:
             self._append( FIELD_STRING )
-        result = await super().fetch_response()
+        session_id, token = await super().fetch_response()
 
-        # IMPORTANT needed to pass the id to other messages
-        self._connection.session_id = result[0]
+        self._connection.session_id = session_id
 
         if self.protocol > 26:
-            if result[1] is None:
+            if token is None:
                 self._request_token = False
-            self.set_session_token(result[1])
+
+            self.set_session_token(token)
 
         return self.session_id
 
@@ -71,7 +71,6 @@ class ShutdownMessage(BaseMessage):
         # order matters
         self._append( ( FIELD_BYTE, SHUTDOWN_OP ) )
 
-    @need_connected
     def prepare(self, params=None):
 
         if isinstance( params, tuple ) or isinstance( params, list ):

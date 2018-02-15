@@ -100,7 +100,6 @@ class OrientDB(object):
             host=host, port=port,
             serialization_type=serialization_type, loop=self._loop
         )
-        self._serialization_type = serialization_type
         self.version = None
         self.clusters = []
         self.nodes = []
@@ -119,25 +118,16 @@ class OrientDB(object):
 
     def close(self):
         self._connection.close()
+        if self._loop.is_running():
+            self._loop.stop()
+        if not self._loop.is_closed():
+            self._loop.close()
 
     def get_class_position(self, cluster_name):
         return self._cluster_map[cluster_name.lower()]
 
     def get_class_name(self, position):
         return self._cluster_reverse_map[position]
-
-    def set_session_token(self, token):
-        """
-        Set true if you want to use token authentication
-        :param token: bool
-        """
-        self._auth_token = token
-        return self
-
-    def get_session_token(self):
-        """Returns the auth token of the session
-        """
-        return self._connection.auth_token
 
     async def connect(self, user, password, client_id=''):
         await self._connection.get_connection()
@@ -189,6 +179,10 @@ class OrientDB(object):
         response = await request.fetch_response()
         self.version, self.clusters, self.nodes = response
         await self.update_properties()
+        print("client after DbOpenMessage")
+        pprint(vars(self))
+        print("client connection after DbOpenMessage")
+        pprint(vars(self._connection))
         return self.clusters
 
     async def db_reload(self):

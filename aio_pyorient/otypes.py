@@ -199,11 +199,11 @@ class OrientVersion(object):
     def _parse_version( self, string_release ):
 
         import re
-        if not isinstance(string_release, str):
-            string_release = string_release.decode()
+        # if not isinstance(string_release, str):
+        #    string_release = string_release
 
         try:
-            version_info = string_release.split( "." )
+            version_info = str(string_release).split( '.' )
             self.major = version_info[0]
             self.minor = version_info[1]
             self.build = version_info[2]

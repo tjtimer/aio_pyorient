@@ -11,39 +11,11 @@ from aio_pyorient.exceptions import (
 from aio_pyorient.messages.base import BaseMessage
 from aio_pyorient.otypes import OrientRecord
 from aio_pyorient.utils import (
-    need_db_opened,
     parse_cluster_id,
     parse_cluster_position
 )
 
 
-#
-# RECORD CREATE
-#
-# Create a new record. Returns the position in the cluster
-#   of the new record. New records can have version > 0 (since v1.0)
-#   in case the RID has been recycled.
-#
-# Request: (cluster-id:short)(record-content:bytes)(record-type:byte)(mode:byte)
-# Response:
-#   (cluster-position:long)(record-version:int)(count-of-collection-changes)
-#   [(uuid-most-sig-bits:long)(uuid-least-sig-bits:long)(updated-file-id:long)
-#   (updated-page-index:long)(updated-page-offset:int)]*
-#
-# - datasegment-id the segment id to store the data (since version 10 - 1.0-SNAPSHOT).
-#    -1 Means default one. Removed since 2.0
-# - record-type is:
-# - 'b': raw bytes
-# - 'f': flat data
-# - 'd': document
-#
-# and mode is:
-# - 0 = synchronous (default mode waits for the answer)
-# - 1 = asynchronous (don't need an answer)
-#
-# The last part of response is referred to RidBag management.
-# Take a look at the main page for more details.
-#
 class RecordCreateMessage(BaseMessage):
 
     def __init__(self, _orient_socket ):
@@ -58,7 +30,6 @@ class RecordCreateMessage(BaseMessage):
         # order matters
         self._append( ( FIELD_BYTE, RECORD_CREATE_OP ) )
 
-    @need_db_opened
     def prepare(self, params=None):
 
         try:
@@ -209,7 +180,6 @@ class RecordDeleteMessage(BaseMessage):
         # order matters
         self._append( ( FIELD_BYTE, RECORD_DELETE_OP ) )
 
-    @need_db_opened
     def prepare(self, params=None):
 
         try:
@@ -304,7 +274,6 @@ class RecordLoadMessage(BaseMessage):
         # order matters
         self._append( ( FIELD_BYTE, RECORD_LOAD_OP ) )
 
-    @need_db_opened
     def prepare(self, params=None):
 
         try:
@@ -452,7 +421,6 @@ class RecordUpdateMessage(BaseMessage):
         # order matters
         self._append( ( FIELD_BYTE, RECORD_UPDATE_OP ) )
 
-    @need_db_opened
     def prepare(self, params=None):
 
         try:

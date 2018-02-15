@@ -96,11 +96,11 @@ class DbOpenMessage(BaseMessage):
 
         # parsing server release version
         info = OrientVersion(release)
-
         if len(nodes_config) > 0:
             _, decoded = self.get_serializer().decode(nodes_config)
             self._node_list = []
-            for node_dict in decoded['members']:
+            print(f"{self._name} decoded: {decoded}")
+            for node_dict in decoded.pop('members', {}):
                 self._node_list.append(OrientNode(node_dict))
 
         # set database opened
@@ -155,7 +155,6 @@ class DbCloseMessage(BaseMessage):
         # order matters
         self._append(( FIELD_BYTE, DB_CLOSE_OP ))
 
-    @need_connected
     def prepare(self, params=None):
         return super().prepare()
 
@@ -193,7 +192,6 @@ class DbExistsMessage(BaseMessage):
         # order matters
         self._append(( FIELD_BYTE, DB_EXIST_OP ))
 
-    @need_connected
     def prepare(self, params=None):
 
         if isinstance(params, tuple) or isinstance(params, list):
@@ -266,7 +264,6 @@ class DbCreateMessage(BaseMessage):
         # order matters
         self._append(( FIELD_BYTE, DB_CREATE_OP ))
 
-    @need_connected
     def prepare(self, params=None):
 
         if isinstance(params, tuple) or isinstance(params, list):
@@ -355,7 +352,6 @@ class DbDropMessage(BaseMessage):
         # order matters
         self._append(( FIELD_BYTE, DB_DROP_OP ))
 
-    @need_connected
     def prepare(self, params=None):
 
         if isinstance(params, tuple) or isinstance(params, list):
@@ -408,7 +404,6 @@ class DbCountRecordsMessage(BaseMessage):
         # order matters
         self._append(( FIELD_BYTE, DB_COUNT_RECORDS_OP ))
 
-    @need_db_opened
     def prepare(self, params=None):
         return super().prepare()
 
@@ -432,7 +427,6 @@ class DbReloadMessage(BaseMessage):
         # order matters
         self._append(( FIELD_BYTE, DB_RELOAD_OP ))
 
-    @need_connected
     def prepare(self, params=None):
         return super().prepare()
 
@@ -478,7 +472,6 @@ class DbSizeMessage(BaseMessage):
         # order matters
         self._append(( FIELD_BYTE, DB_SIZE_OP ))
 
-    @need_db_opened
     def prepare(self, params=None):
         return super().prepare()
 
@@ -502,7 +495,6 @@ class DbListMessage(BaseMessage):
         # order matters
         self._append(( FIELD_BYTE, DB_LIST_OP ))
 
-    @need_connected
     def prepare(self, params=None):
         return super().prepare()
 

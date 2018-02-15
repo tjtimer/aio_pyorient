@@ -116,8 +116,7 @@ class OrientSerializationCSV(object):
             return self.className, self.data
 
         if not isinstance(content, str):
-            content = content.decode()
-
+            content = str(content)
         content = content.strip()
 
         collected, offset, is_class_name = self._parse_first_key(content, offset=0)

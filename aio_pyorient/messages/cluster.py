@@ -3,7 +3,6 @@ from aio_pyorient.constants import (CLUSTER_TYPES, CLUSTER_TYPE_PHYSICAL, DATA_C
                                     FIELD_LONG, FIELD_SHORT, FIELD_STRING)
 from aio_pyorient.exceptions import PyOrientBadMethodCallException
 from aio_pyorient.messages.base import BaseMessage
-from aio_pyorient.utils import need_db_opened
 
 
 #
@@ -20,7 +19,7 @@ from aio_pyorient.utils import need_db_opened
 class DataClusterAddMessage(BaseMessage):
 
     def __init__(self, _orient_socket ):
-        super( DataClusterAddMessage, self ).__init__(_orient_socket)
+        super().__init__(_orient_socket)
 
         self._cluster_name     = ''
         self._cluster_type     = CLUSTER_TYPE_PHYSICAL
@@ -31,15 +30,13 @@ class DataClusterAddMessage(BaseMessage):
         # order matters
         self._append( ( FIELD_BYTE, DATA_CLUSTER_ADD_OP ) )
 
-    @need_db_opened
     def prepare(self, params=None):
 
         try:
-            # mandatory if not passed by method
             self._cluster_name = params[0]
 
-            # mandatory if not passed by method
-            self.set_cluster_type( params[1] )
+            if params[1] in CLUSTER_TYPES:
+                self._cluster_type = params[1]
             self._cluster_location = params[2]
             self._datasegment_name = params[3]
 
@@ -51,7 +48,7 @@ class DataClusterAddMessage(BaseMessage):
                 params[1] + ' is not a valid data cluster type', []
             )
 
-        if self.get_protocol() < 24:
+        if self.protocol < 24:
             self._append( ( FIELD_STRING, self._cluster_type ) )
             self._append( ( FIELD_STRING, self._cluster_name ) )
             self._append( ( FIELD_STRING, self._cluster_location ) )
@@ -59,27 +56,17 @@ class DataClusterAddMessage(BaseMessage):
         else:
             self._append( ( FIELD_STRING, self._cluster_name ) )
 
-        if self.get_protocol() >= 18:
+        if self.protocol >= 18:
             self._append( ( FIELD_SHORT, self._new_cluster_id ) )
 
-        return super( DataClusterAddMessage, self ).prepare()
+        return super().prepare()
 
-    def fetch_response(self):
+    async def fetch_response(self):
         self._append( FIELD_SHORT )
-        return super( DataClusterAddMessage, self ).fetch_response()[0]
+        return list(await super().fetch_response())[0]
 
     def set_cluster_name(self, _cluster_name):
         self._cluster_name = _cluster_name
-        return self
-
-    def set_cluster_type(self, _cluster_type):
-        if _cluster_type in CLUSTER_TYPES:
-            # user choice storage if present
-            self._cluster_type = _cluster_type
-        else:
-            raise PyOrientBadMethodCallException(
-                _cluster_type + ' is not a valid cluster type', []
-            )
         return self
 
     def set_cluster_location(self, _cluster_location):
@@ -94,22 +81,6 @@ class DataClusterAddMessage(BaseMessage):
         self._new_cluster_id = _new_cluster_id
         return self
 
-#
-# DATA CLUSTER COUNT
-#
-# Returns the number of records in one or more clusters.
-#
-# Request: (cluster-count:short)(cluster-number:short)*(count-tombstones:byte)
-# Response: (records-in-clusters:long)
-# Where:
-#
-# cluster-count the number of requested clusters
-# cluster-number the cluster id of each single cluster
-# count-tombstones the flag which indicates whether deleted records
-#   should be taken in account. It is applicable for autosharded storage only,
-#   otherwise it is ignored.
-# records-in-clusters is the total number of records found in the requested clusters
-#
 class DataClusterCountMessage(BaseMessage):
 
     def __init__(self, _orient_socket ):
@@ -121,7 +92,6 @@ class DataClusterCountMessage(BaseMessage):
         # order matters
         self._append( ( FIELD_BYTE, DATA_CLUSTER_COUNT_OP ) )
 
-    @need_db_opened
     def prepare(self, params=None):
 
         if isinstance( params, tuple ) or isinstance( params, list ):
@@ -148,9 +118,9 @@ class DataClusterCountMessage(BaseMessage):
 
         return super( DataClusterCountMessage, self ).prepare()
 
-    def fetch_response(self):
+    async def fetch_response(self):
         self._append( FIELD_LONG )
-        return super( DataClusterCountMessage, self ).fetch_response()[0]
+        return list(await super().fetch_response())[0]
 
     def set_cluster_ids(self, _cluster_ids):
         self._cluster_ids = _cluster_ids
@@ -161,14 +131,6 @@ class DataClusterCountMessage(BaseMessage):
         return self
 
 
-#
-# DATA CLUSTER DATA RANGE
-#
-# Returns the range of record ids for a cluster.
-#
-# Request: (cluster-number:short)
-# Response: (begin:long)(end:long)
-#
 class DataClusterDataRangeMessage(BaseMessage):
 
     def __init__(self, _orient_socket ):
@@ -180,7 +142,6 @@ class DataClusterDataRangeMessage(BaseMessage):
         # order matters
         self._append( ( FIELD_BYTE, DATA_CLUSTER_DATA_RANGE_OP ) )
 
-    @need_db_opened
     def prepare(self, params=None):
 
         if isinstance( params, int ):
@@ -190,23 +151,16 @@ class DataClusterDataRangeMessage(BaseMessage):
         self._append( ( FIELD_SHORT, self._cluster_id ) )
         return super( DataClusterDataRangeMessage, self ).prepare()
 
-    def fetch_response(self):
+    async def fetch_response(self):
         self._append( FIELD_LONG )
         self._append( FIELD_LONG )
-        return super( DataClusterDataRangeMessage, self ).fetch_response()
+        return await super().fetch_response()
 
     def set_cluster_id(self, _cluster_id):
         self._cluster_id = _cluster_id
         return self
 
-#
-# DATA CLUSTER DROP
-#
-# Remove a cluster.
-#
-# Request: (cluster-number:short)
-# Response: (delete-on-clientside:byte)
-#
+
 class DataClusterDropMessage(BaseMessage):
 
     def __init__(self, _orient_socket ):
@@ -218,7 +172,6 @@ class DataClusterDropMessage(BaseMessage):
         # order matters
         self._append( ( FIELD_BYTE, DATA_CLUSTER_DROP_OP ) )
 
-    @need_db_opened
     def prepare(self, params=None):
 
         if isinstance( params[0], int ):
@@ -226,11 +179,11 @@ class DataClusterDropMessage(BaseMessage):
             self._cluster_id = params[0]
 
         self._append( ( FIELD_SHORT, self._cluster_id ) )
-        return super( DataClusterDropMessage, self ).prepare()
+        return super().prepare()
 
-    def fetch_response(self):
+    async def fetch_response(self):
         self._append( FIELD_BOOLEAN )
-        return super( DataClusterDropMessage, self ).fetch_response()[0]
+        return list(await super().fetch_response())[0]
 
     def set_cluster_id(self, _cluster_id):
         self._cluster_id = _cluster_id
