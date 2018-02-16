@@ -79,6 +79,7 @@ class BaseMessage(object):
         return self
 
     def _reset_fields_definition(self):
+        self._input_buffer = b''
         self._fields_definition = []
 
     def prepare(self, *args):
@@ -100,9 +101,12 @@ class BaseMessage(object):
 
     @property
     def output_buffer(self):
-        return b''.join(
+        if len(self._fields_definition) <=0:
+            return b''
+        buffer = b''.join(
             self._encode_field( x ) for x in self._fields_definition
         )
+        return buffer
 
     async def handle_request_error(self):
         exception_class = b''
@@ -202,8 +206,9 @@ class BaseMessage(object):
         :param _continue:
         :return:
         """
+
+        self._body = []
         if len(_continue) is not 0:
-            self._body = []
             await self._decode_body()
             # self.dump_streams()
         # already fetched, get last results as cache info
@@ -214,10 +219,6 @@ class BaseMessage(object):
         return self._body
 
     def _append(self, field):
-        """
-        @:rtype self: BaseMessage
-        @type field: object
-        """
         self._fields_definition.append( field )
         return self
 
