@@ -1,3 +1,3 @@
-from .client import OrientDB
+from .client import ODBClient
 
-__all__ = ('OrientDB',)
+__all__ = ('ODBClient',)

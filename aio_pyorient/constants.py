@@ -3,7 +3,7 @@ __author__ = 'mogui <mogui83@gmail.com>'
 #
 # Driver Constants
 #
-NAME = "OrientDB binary client (aio_pyorient)"
+NAME = "ODBClient binary client (aio_pyorient)"
 VERSION = "0.0.1"
 SUPPORTED_PROTOCOL = 37
 

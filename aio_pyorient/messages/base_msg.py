@@ -2,16 +2,15 @@ import asyncio
 import struct
 import sys
 
-from aio_pyorient.exceptions import PyOrientBadMethodCallException, \
-    PyOrientCommandException, PyOrientNullRecordException
-from aio_pyorient.otypes import OrientRecord, OrientRecordLink, OrientNode
-
-from aio_pyorient.hexdump import hexdump
-from aio_pyorient.constants import BOOLEAN, BYTE, BYTES, CHAR, FIELD_BOOLEAN, FIELD_BYTE, \
-    FIELD_INT, FIELD_RECORD, FIELD_SHORT, FIELD_STRING, FIELD_TYPE_LINK, INT, \
-    LINK, LONG, RECORD, SHORT, STRING, STRINGS
-from aio_pyorient.sock import OrientSocket
+from aio_pyorient.constants import (BOOLEAN, BYTE, BYTES, CHAR, FIELD_BOOLEAN, FIELD_BYTE,
+                                    FIELD_INT, FIELD_RECORD, FIELD_SHORT, FIELD_STRING, FIELD_TYPE_LINK, INT,
+                                    LINK, LONG, RECORD, SHORT, STRING, STRINGS)
+from aio_pyorient.exceptions import (PyOrientBadMethodCallException,
+                                     PyOrientCommandException, PyOrientNullRecordException)
+from aio_pyorient.otypes import OrientNode, OrientRecord, OrientRecordLink
 from aio_pyorient.serializations import OrientSerialization
+from aio_pyorient.sock import ODBSocket
+
 
 class BaseMessage(object):
     _name = None
@@ -19,10 +18,10 @@ class BaseMessage(object):
     def __init_subclass__(cls, *args, **kwargs):
         cls._name = cls.__name__
 
-    def __init__(self, sock=OrientSocket(), *,
+    def __init__(self, sock=ODBSocket(), *,
                  loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()):
         """
-        :type sock: OrientSocket
+        :type sock: ODBSocket
         """
         self._loop = loop
         self._connection = sock
@@ -69,8 +68,8 @@ class BaseMessage(object):
 
     def get_serializer(self):
         """
-        Lazy return of the serialization, we retrive the type from the :class: `OrientSocket
-        <aio_pyorient.orient.OrientSocket>` object
+        Lazy return of the serialization, we retrive the type from the :class: `ODBSocket
+        <aio_pyorient.orient.ODBSocket>` object
         :return: an Instance of the serializer suitable for decoding or encoding
         """
         if self._connection.serialization_type == OrientSerialization.Binary:
@@ -283,7 +282,7 @@ class BaseMessage(object):
         return f"<{self._name} ready={self.ready}"
 
     async def send(self):
-        if self._connection.in_transaction is False:
+        if self._connection._in_transaction is False:
             await self._connection.write(self._output_buffer)
             self._reset_fields_definition()
         return self
@@ -342,8 +341,8 @@ class BaseMessage(object):
         # read buffer length and decode value by field definition
         if _type['bytes'] is not None:
             _value = await self._connection.read(_type['bytes'])
-        print(f"OrientSocket read type: {_type}")
-        print(f"OrientSocket read type: {_value}")
+        print(f"ODBSocket read type: {_type}")
+        print(f"ODBSocket read type: {_value}")
         # if it is a string decode first 4 Bytes as INT
         # and try to read the buffer
         if _type['type'] == STRING or _type['type'] == BYTES:

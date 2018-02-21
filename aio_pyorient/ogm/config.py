@@ -9,7 +9,7 @@ except ImportError:
     from urlparse import urlparse, urlunparse
 
 class Config(object):
-    """Specifies how to connect to OrientDB server."""
+    """Specifies how to connect to ODBClient server."""
     def __init__(self, host, port, user, cred, db_name=None, storage='memory'
                  , initial_drop=False, serialization_type=OrientSerialization.CSV):
         """

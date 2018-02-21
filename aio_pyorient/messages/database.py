@@ -23,36 +23,37 @@ class DbOpenMessage(BaseMessage):
     def prepare(self, params=None):
 
         if isinstance(params, tuple) or isinstance(params, list):
+
+            self._append((FIELD_STRINGS, [NAME, VERSION]))
+            self._append((FIELD_SHORT, SUPPORTED_PROTOCOL))
+            self._append((FIELD_STRING, self._client_id))
+
+            if self.protocol > 21:
+                self._append((FIELD_STRING, self._connection.serialization_type))
+                if self.protocol > 26:
+                    self._append((FIELD_BOOLEAN, self._request_token))
+                    if self.protocol >= 36:
+                        self._append((FIELD_BOOLEAN, True))  # support-push
+                        self._append((FIELD_BOOLEAN, True))  # collect-stats
+
+            self._append((FIELD_STRING, self._db_name))
+
+            if self.protocol < 33:
+                self._append((FIELD_STRING, self._db_type))
+
+            self._append((FIELD_STRING, self._user))
+            self._append((FIELD_STRING, self._pass))
             try:
                 self._db_name = params[0]
                 self._user = params[1]
                 self._pass = params[2]
                 self.set_db_type(params[3])
                 self._client_id = params[4]
-                
+
             except IndexError:
                 # Use default for non existent indexes
                 pass
 
-        self._append(( FIELD_STRINGS, [NAME, VERSION] ))
-        self._append(( FIELD_SHORT, SUPPORTED_PROTOCOL ))
-        self._append(( FIELD_STRING, self._client_id ))
-
-        if self.protocol > 21:
-            self._append((FIELD_STRING, self._connection.serialization_type))
-            if self.protocol > 26:
-                self._append(( FIELD_BOOLEAN, self._request_token ))
-                if self.protocol >= 36:
-                    self._append(( FIELD_BOOLEAN, True ))  # support-push
-                    self._append(( FIELD_BOOLEAN, True ))  # collect-stats
-
-        self._append(( FIELD_STRING, self._db_name ))
-
-        if self.protocol < 33:
-            self._append(( FIELD_STRING, self._db_type ))
-
-        self._append(( FIELD_STRING, self._user ))
-        self._append(( FIELD_STRING, self._pass ))
 
         return super().prepare()
 
@@ -142,7 +143,7 @@ class DbOpenMessage(BaseMessage):
 #
 # DB CLOSE
 #
-# Closes the database and the network connection to the OrientDB Server
+# Closes the database and the network connection to the ODBClient Server
 # instance. No return is expected. The socket is also closed.
 #
 # Request: empty
@@ -168,7 +169,7 @@ class DbCloseMessage(BaseMessage):
 #
 # DB EXISTS
 #
-# Asks if a database exists in the OrientDB Server instance. It returns true (non-zero) or false (zero).
+# Asks if a database exists in the ODBClient Server instance. It returns true (non-zero) or false (zero).
 #
 # Request: (database-name:string) <-- before 1.0rc1 this was empty (server-storage-type:string - since 1.5-snapshot)
 # Response: (result:byte)
@@ -236,7 +237,7 @@ class DbExistsMessage(BaseMessage):
 #
 # DB CREATE
 #
-# Creates a database in the remote OrientDB server instance
+# Creates a database in the remote ODBClient server instance
 #
 # Request: (database-name:string)(database-type:string)(storage-type:string)
 # Response: empty
@@ -326,7 +327,7 @@ class DbCreateMessage(BaseMessage):
 #
 # DB DROP
 #
-# Removes a database from the OrientDB Server instance.
+# Removes a database from the ODBClient Server instance.
 # It returns nothing if the database has been deleted or throws
 # a OStorageException if the database doesn't exists.
 #
@@ -389,7 +390,7 @@ class DbDropMessage(BaseMessage):
 # DB COUNT RECORDS
 #
 # Asks for the number of records in a database in
-# the OrientDB Server instance.
+# the ODBClient Server instance.
 #
 # Request: empty
 # Response: (count:long)
@@ -460,7 +461,7 @@ class DbReloadMessage(BaseMessage):
 #
 # DB SIZE
 #
-# Asks for the size of a database in the OrientDB Server instance.
+# Asks for the size of a database in the ODBClient Server instance.
 #
 # Request: empty
 # Response: (size:long)
@@ -483,7 +484,7 @@ class DbSizeMessage(BaseMessage):
 #
 # DB List
 #
-# Asks for the size of a database in the OrientDB Server instance.
+# Asks for the size of a database in the ODBClient Server instance.
 #
 # Request: empty
 # Response: (size:long)

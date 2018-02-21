@@ -2,7 +2,8 @@ import asyncio
 
 import pytest
 
-from aio_pyorient import OrientDB
+from aio_pyorient import ODBClient
+
 
 @pytest.fixture(scope="module")
 def loop(request):
@@ -15,5 +16,5 @@ def loop(request):
 
 @pytest.fixture(scope="module")
 def client(loop):
-    client = OrientDB("localhost", 2424, loop=loop)
+    client = ODBClient("localhost", 2424, loop=loop)
     return client

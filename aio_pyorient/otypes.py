@@ -179,7 +179,7 @@ class OrientVersion(object):
         :param release: String release
         """
 
-        #: string full OrientDB release
+        #: string full ODBClient release
         self.release = release
 
         #: Major version

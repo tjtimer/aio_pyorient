@@ -6,7 +6,7 @@ setup(
     url='https://github.com/tjtimer/aio_pyorient',
     author='Tim "tjtimer" Jedro',
     author_email='tjtimer@gmail.com',
-    description='async OrientDB client library',
+    description='async ODBClient client library',
     long_description=open('README.rst').read(),
     license='LICENSE',
     packages = [

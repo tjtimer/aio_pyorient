@@ -119,7 +119,7 @@ class Query(object):
                             yield next(iter(response.oRecordData.values()))
                             break
                         elif response._rid == current_skip:
-                            # OrientDB bug?
+                            # ODBClient bug?
                             # expand() makes for strange responses
                             break
                         else:
@@ -457,7 +457,7 @@ class Query(object):
 
             if prop_names is not None:
                 # Multiple, distinct what's can alias to the same name
-                # Make unique; consistent with what OrientDB assumes
+                # Make unique; consistent with what ODBClient assumes
                 used_names = {}
                 for idx, name in enumerate(prop_names):
                     prop_names[idx] = Query.unique_prop_name(name, used_names)

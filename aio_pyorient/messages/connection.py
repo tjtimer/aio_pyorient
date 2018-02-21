@@ -1,12 +1,10 @@
 from aio_pyorient.constants import (CONNECT_OP, FIELD_BOOLEAN, FIELD_BYTE, FIELD_INT, FIELD_SHORT, FIELD_STRING,
                                     FIELD_STRINGS, NAME, SHUTDOWN_OP, SUPPORTED_PROTOCOL, VERSION)
-from aio_pyorient.messages.base import BaseMessage
 
 
-class ConnectMessage(BaseMessage):
+class Message:
 
-    def __init__(self, _orient_socket):
-        super().__init__(_orient_socket)
+    def __init__(self, ):
 
         self._user = ''
         self._pass = ''

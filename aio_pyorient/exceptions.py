@@ -15,7 +15,7 @@ class PyOrientException(Exception):
             "OIndexException": PyOrientIndexException
         }
 
-        # Override the exception Type with OrientDB exception map
+        # Override the exception Type with ODBClient exception map
         if _errorClass in x.keys():
             self.__class__ = x[ _errorClass ]
 

@@ -20,7 +20,7 @@ class Graph(object):
 
     def __init__(self, config, user=None, cred=None, strict=False, *,
                  loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()):
-        """Connect to OrientDB graph database, creating the database if
+        """Connect to ODBClient graph database, creating the database if
         non-existent.
 
         :param config: Information on database to which to connect
@@ -35,7 +35,7 @@ class Graph(object):
         self._is_connected = asyncio.Event(loop=self._loop)
         self._init_tasks = []
         # public attributes
-        self.client = aio_pyorient.OrientDB(
+        self.client = aio_pyorient.ODBClient(
             config.host, config.port, config.serialization_type
         )
         connection_task = self._loop.create_task(

@@ -1,9 +1,6 @@
 import asyncio
-import functools
 import typing
 
-import os
-import sys
 from aio_pyorient.otypes import OrientRecordLink
 
 
@@ -24,19 +21,10 @@ class AsyncObject(object):
 
     def create_task(self,
                     coro: typing.Callable,
-                    coro_args: tuple or list, *,
-                    name: str = None,
-                    cb: typing.Callable = None,
-                    cb_args: tuple or list = None):
+                    *coro_args: tuple or list,
+                    name: str = None):
         name = name if name else coro.__name__
         _task = self._loop.create_task(coro(*coro_args))
-        if cb:
-            if cb_args:
-                _task.add_done_callback(
-                    functools.partial(cb, *cb_args)
-                )
-            else:
-                _task.add_done_callback(cb)
         self._tasks[name] = _task
         return self._tasks[name]
 
@@ -92,12 +80,3 @@ def parse_cluster_position(_cluster_position):
         # so treat it as one param
         _position = _cluster_position
     return _position
-
-def u(x):
-    return x
-
-def to_str(x):
-    return str(x)
-
-def to_unicode(x):
-    return str(x)

@@ -1,6 +1,5 @@
 import asyncio
 import struct
-import sys
 
 from aio_pyorient.constants import (BOOLEAN, BYTE, BYTES, CHAR, FIELD_BOOLEAN, FIELD_BYTE, FIELD_INT, FIELD_RECORD,
                                     FIELD_SHORT, FIELD_STRING, FIELD_TYPE_LINK, INT, LINK, LONG, RECORD, REQUEST_ERROR,
@@ -9,7 +8,7 @@ from aio_pyorient.exceptions import (PyOrientBadMethodCallException,
                                      PyOrientCommandException, PyOrientNullRecordException)
 from aio_pyorient.otypes import OrientNode, OrientRecord, OrientRecordLink
 from aio_pyorient.serializations import OrientSerialization
-from aio_pyorient.sock import OrientSocket
+from aio_pyorient.sock import ODBSocket
 
 
 class BaseMessage(object):
@@ -18,10 +17,10 @@ class BaseMessage(object):
     def __init_subclass__(cls, *args, **kwargs):
         cls._name = cls.__name__
 
-    def __init__(self, sock=OrientSocket(), *,
+    def __init__(self, sock=ODBSocket(), *,
                  loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()):
         """
-        :type sock: OrientSocket
+        :type sock: ODBSocket
         """
         self._loop = loop
         self._connection = sock
@@ -227,7 +226,7 @@ class BaseMessage(object):
         return f"<{self._name} ready={self.ready}"
 
     async def send(self):
-        if not self._connection.in_transaction:
+        if not self._connection._in_transaction:
             await self._connection.write(self.output_buffer)
             self._fields_definition = []
         return self
