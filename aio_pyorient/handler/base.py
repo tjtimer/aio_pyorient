@@ -1,100 +1,194 @@
+import asyncio
+import inspect
+import struct
 from collections import namedtuple
 
 from aio_pyorient.constants import NAME, SUPPORTED_PROTOCOL, VERSION
-from aio_pyorient.handler.fields import Boolean, Byte, Bytes, Integer, Short, String
-from aio_pyorient.serializations import OrientSerialization
+from aio_pyorient.handler.fields import Byte, Bytes, Integer, Short, String
+from aio_pyorient.utils import AsyncObject
 
-ODBHeader = namedtuple('ODBHeader', 'status, session_id, auth_token')
+int_packer = struct.Struct("!i")
+short_packer = struct.Struct("!h")
+long_packer = struct.Struct("!q")
 
-HANDSHAKE = String.encode(NAME) + String.encode(VERSION) + Short.encode(SUPPORTED_PROTOCOL)
+
+class Boolean:
+
+    @staticmethod
+    def encode(value):
+        print("Boolean", value)
+        return bytes([1]) if value else bytes([0])
+
+    @staticmethod
+    async def decode(sock):
+        decoded = ord(await sock.recv(1)) is 1
+        print(decoded)
+        return decoded
 
 
-def get_request_header(op: int, session_id: int, auth_token: str = None):
-    header = Byte.encode(chr(op)) + Integer.encode(session_id)
-    if auth_token:
-        print("encoding auth token: ", auth_token)
-        header += Bytes.encode(auth_token)
-    print("request header: ", header)
-    return header
+class Byte:
 
+    @staticmethod
+    def encode(value):
+        print("Byte", value)
+        return bytes([ord(value)])
+
+    @staticmethod
+    async def decode(sock):
+        decoded = ord(await sock.recv(1))
+        print(decoded)
+        return decoded
+
+
+class Bytes:
+
+    @staticmethod
+    def encode(value):
+        print("Bytes", value)
+        return int_packer.pack(len(value)) + value
+
+    @staticmethod
+    async def decode(sock):
+        value = b''
+        _len = await Integer.decode(sock)
+        if _len > 0:
+            value = await sock.recv(_len)
+        print(value)
+        return value
+
+
+class String:
+
+    @staticmethod
+    def encode(value):
+        print(value, type(value))
+        encoded = int_packer.pack(len(value)) + bytes(value, encoding="utf-8")
+        print(encoded)
+        return encoded
+
+    @staticmethod
+    async def decode(sock):
+        decoded = ""
+        _len = await Integer.decode(sock)
+        if _len > 0:
+            value = await sock.recv(_len)
+            decoded = value.decode("utf-8")
+        print(decoded)
+        return decoded
+
+
+class Integer:
+
+    @staticmethod
+    def encode(value):
+        print("Integer", value)
+        return int_packer.pack(value)
+
+    @staticmethod
+    async def decode(sock):
+        decoded = int_packer.unpack(await sock.recv(4))[0]
+        print(decoded)
+        return decoded
+
+
+class Short:
+
+    @staticmethod
+    def encode(value):
+        print("Short", value)
+        return short_packer.pack(value)
+
+    @staticmethod
+    async def decode(sock):
+        decoded = short_packer.unpack(await sock.recv(2))[0]
+        print(decoded)
+        return decoded
+
+
+class Long:
+
+    @staticmethod
+    def encode(value):
+        print("Long", value)
+        return long_packer.pack(value)
+
+    @staticmethod
+    async def decode(sock):
+        decoded = long_packer.unpack(await sock.recv(2))[0]
+        print(decoded)
+        return decoded
+
+
+class Introduction:
+
+    @staticmethod
+    def encode(_):
+        return String.encode(NAME) + String.encode(VERSION) + Short.encode(SUPPORTED_PROTOCOL)
+
+
+class RequestHeader:
+
+    @staticmethod
+    def encode(arg):
+        header = Byte.encode(chr(arg[0])) + Integer.encode(arg[1])
+        if len(arg) is 2:
+            return header
+        return header + Bytes.encode(arg[2])
 
 ODBResponseHeader = namedtuple('ODBResponseHeader', 'status, session_id')
-ODBCluster = namedtuple('ODBCluster', 'name, c_id')
-
-async def read_header(sock):
-    return ODBResponseHeader(
-        await Byte.decode(sock), await Integer.decode(sock)
-    )
+ODBCluster = namedtuple('ODBCluster', 'name, id')
 
 
-async def read_clusters(client):
-    for _ in range(await Short.decode(client._sock)):
-        client.clusters.append(
-            ODBCluster(await String.decode(client._sock), await Short.decode(client._sock))
+class ODBSignal:
+
+    def __init__(self):
+        self._subscribers = []
+
+    def __call__(self, coro, *args, **kwargs):
+        assert inspect.isawaitable(coro), \
+            "First argument must be awaitable, e.g. coroutine or future."
+        self._subscribers.append((coro, args, kwargs))
+
+    async def send(self, handler):
+        await asyncio.gather(
+            *(sub[0](handler, *sub[1], **sub[2])
+              for sub in self._subscribers)
         )
-    return client
 
-def get_connect_request(
-        user: str, password: str, *,
-        client_id: str = '',
-        serialization_type: OrientSerialization = OrientSerialization.CSV,
-        use_token_auth: bool = True,
-        support_push: bool = True,
-        collect_stats: bool = True):
-    return b''.join(
-        (
-            get_request_header(2, -1),
-            HANDSHAKE,
-            String.encode(client_id),
-            String.encode(serialization_type),
-            Boolean.encode(use_token_auth),
-            Boolean.encode(support_push),
-            Boolean.encode(collect_stats),
-            String.encode(user),
-            String.encode(password)
+
+class BaseHandler(AsyncObject):
+
+    def __init__(self, client, *args):
+        super().__init__(loop=client._loop)
+        self._sent = asyncio.Event(loop=self._loop)
+        self._client = client
+        self._sock = client._sock
+        self._request = b''.join(
+            field_type.encode(value)
+            for field_type, value in args
         )
-    )
+        self.before_send = ODBSignal()
+        self.before_read = ODBSignal()
+        self.on_done = ODBSignal()
+        self.response = None
 
-def get_db_open_request(
-        db_name: str, user: str, password: str, *,
-        client_id: str = '',
-        serialization_type: OrientSerialization = OrientSerialization.CSV,
-        use_token_auth: bool = True,
-        support_push: bool = True,
-        collect_stats: bool = True):
-    return b''.join(
-        (
-            get_request_header(3, -1),
-            HANDSHAKE,
-            String.encode(client_id),
-            String.encode(serialization_type),
-            Boolean.encode(use_token_auth),
-            Boolean.encode(support_push),
-            Boolean.encode(collect_stats),
-            String.encode(db_name),
-            String.encode(user),
-            String.encode(password)
+    async def _on_done(self):
+        await self._done.wait()
+        self.on_done.send(self)
+
+    async def send(self):
+        await self.before_send.send(self)
+        await self._sock.send(self._request)
+        self._sent.set()
+        return self
+
+    async def read_header(self):
+        await self._sent.wait()
+        await self.before_read.send(self)
+        return ODBResponseHeader(
+            await Byte.decode(self._sock), await Integer.decode(self._sock)
         )
-    )
 
-
-async def connect_response(client):
-    await read_header(client._sock)
-    client._session_id, client._auth_token = [
-        await Integer.decode(client._sock), await Bytes.decode(client._sock)
-    ]
-    return client
-
-
-async def db_open_response(client):
-    await connect_response(client)
-    await read_clusters(client)
-    client._cluster_conf = await Bytes.decode(client._sock)
-    client._server_release = await String.decode(client._sock)
-    return client
-
-
-async def db_reload_response(client):
-    await connect_response(client)
-    await read_clusters(client)
-    return client
+    async def read_clusters(self):
+        for _ in range(await Short.decode(self._sock)):
+            yield ODBCluster(await String.decode(self._sock), await Short.decode(self._sock))

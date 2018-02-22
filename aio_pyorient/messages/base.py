@@ -227,7 +227,7 @@ class BaseMessage(object):
 
     async def send(self):
         if not self._connection._in_transaction:
-            await self._connection.write(self.output_buffer)
+            await self._connection.send(self.output_buffer)
             self._fields_definition = []
         return self
 
@@ -267,14 +267,14 @@ class BaseMessage(object):
     async def _decode_field(self, _type):
         _value = b""
         if _type['bytes'] is not None:
-            _value = await self._connection.read(_type['bytes'])
+            _value = await self._connection.recv(_type['bytes'])
         if _type['type'] in [STRING, BYTES]:
 
             _len = struct.unpack('>i', _value)[0]
             if _len <= 0:
                 _decoded_string = b''
             else:
-                _decoded_string = await self._connection.read(_len)
+                _decoded_string = await self._connection.recv(_len)
 
             self._input_buffer += _value
             self._input_buffer += _decoded_string

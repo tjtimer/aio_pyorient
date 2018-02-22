@@ -141,10 +141,10 @@ class CommandMessage(BaseMessage):
             # this should be never happen, used only to debug the protocol
             msg = b''
             # self._orientSocket._socket.setblocking( 0 )
-            m = await self._connection.read(1)
+            m = await self._connection.recv(1)
             while m != "":
                 msg += m
-                m = await self._connection.read(1)
+                m = await self._connection.recv(1)
 
         return res
 

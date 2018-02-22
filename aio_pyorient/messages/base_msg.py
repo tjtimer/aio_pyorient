@@ -283,7 +283,7 @@ class BaseMessage(object):
 
     async def send(self):
         if self._connection._in_transaction is False:
-            await self._connection.write(self._output_buffer)
+            await self._connection.send(self._output_buffer)
             self._reset_fields_definition()
         return self
 
@@ -340,7 +340,7 @@ class BaseMessage(object):
         _value = b""
         # read buffer length and decode value by field definition
         if _type['bytes'] is not None:
-            _value = await self._connection.read(_type['bytes'])
+            _value = await self._connection.recv(_type['bytes'])
         print(f"ODBSocket read type: {_type}")
         print(f"ODBSocket read type: {_value}")
         # if it is a string decode first 4 Bytes as INT
@@ -351,7 +351,7 @@ class BaseMessage(object):
             if _len == -1 or _len == 0:
                 _decoded_string = b''
             else:
-                _decoded_string = await self._connection.read(_len)
+                _decoded_string = await self._connection.recv(_len)
 
             self._input_buffer += _value
             self._input_buffer += _decoded_string

@@ -14,7 +14,7 @@ class Boolean:
 
     @staticmethod
     async def decode(sock):
-        decoded = ord(await sock.read(1)) is 1
+        decoded = ord(await sock.recv(1)) is 1
         print(decoded)
         return decoded
 
@@ -28,7 +28,7 @@ class Byte:
 
     @staticmethod
     async def decode(sock):
-        decoded = ord(await sock.read(1))
+        decoded = ord(await sock.recv(1))
         print(decoded)
         return decoded
 
@@ -45,7 +45,7 @@ class Bytes:
         value = b''
         _len = await Integer.decode(sock)
         if _len > 0:
-            value = await sock.read(_len)
+            value = await sock.recv(_len)
         print(value)
         return value
 
@@ -64,7 +64,7 @@ class String:
         decoded = ""
         _len = await Integer.decode(sock)
         if _len > 0:
-            value = await sock.read(_len)
+            value = await sock.recv(_len)
             decoded = value.decode("utf-8")
         print(decoded)
         return decoded
@@ -79,7 +79,7 @@ class Integer:
 
     @staticmethod
     async def decode(sock):
-        decoded = int_packer.unpack(await sock.read(4))[0]
+        decoded = int_packer.unpack(await sock.recv(4))[0]
         print(decoded)
         return decoded
 
@@ -93,7 +93,7 @@ class Short:
 
     @staticmethod
     async def decode(sock):
-        decoded = short_packer.unpack(await sock.read(2))[0]
+        decoded = short_packer.unpack(await sock.recv(2))[0]
         print(decoded)
         return decoded
 
@@ -107,6 +107,6 @@ class Long:
 
     @staticmethod
     async def decode(sock):
-        decoded = long_packer.unpack(await sock.read(2))[0]
+        decoded = long_packer.unpack(await sock.recv(2))[0]
         print(decoded)
         return decoded

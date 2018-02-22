@@ -62,7 +62,7 @@ class ODBSocket(AsyncObject):
         self._port = 0
         self._protocol = None
 
-    async def write(self, buff):
+    async def send(self, buff):
         await self._connected.wait()
         self._sent.clear()
         self._writer.write(buff)
@@ -70,11 +70,8 @@ class ODBSocket(AsyncObject):
         self._sent.set()
         return len(buff)
 
-    async def read(self, _len_to_read):
+    async def recv(self, _len_to_read):
         await self._sent.wait()
-        print("reading", _len_to_read)
         buf = await self._reader.read(_len_to_read)
-        print(f"did read {len(buf)}")
         self._reader.feed_data(buf)
-        print(buf, self._reader)
         return buf

@@ -1,7 +1,6 @@
 import asyncio
 
-from aio_pyorient.handler.base import (connect_response, db_open_response,
-                                       db_reload_response, get_connect_request, get_db_open_request, get_request_header)
+from aio_pyorient.handler import db, server
 from aio_pyorient.sock import ODBSocket
 
 try:
@@ -44,7 +43,7 @@ class ODBClient(object):
     _sock = None
     _session_id = -1
     _auth_token = b''
-    _server_release = ''
+    _server_version = ''
     _cluster_conf = None
 
     def __init__(self,
@@ -88,26 +87,9 @@ class ODBClient(object):
         return self._cluster_reverse_map[position]
 
     async def connect(self, user, password, **kwargs):
-        await self._sock.write(get_connect_request(user, password, **kwargs))
-        await connect_response(self)
-        print(f"client connect_response:")
-        print(f"\theader session_id: {self._session_id}")
-        print(f"\theader auth_token: {self._auth_token}")
-        return self._session_id, self._auth_token
+        request = await server.Connect(self, user, password, **kwargs).send()
+        return await request.read()
 
     async def db_open(self, db_name, user, password, **kwargs):
-        await self._sock.write(
-            get_db_open_request(db_name, user, password, **kwargs)
-        )
-        await db_open_response(self)
-
-        print(f"client db opened:")
-        print(f"\tsession_id: {self._session_id}")
-        print(f"\tauth_token: {self._auth_token}")
-        print(f"\tsock vars: {vars(self._sock)}")
-        return self.clusters
-
-    async def db_reload(self):
-        await self._send(get_request_header(73, self._session_id, self._auth_token))
-        await db_reload_response(self)
-        return self.clusters
+        request = await db.Open(self, db_name, user, password, **kwargs).send()
+        return await request.read()

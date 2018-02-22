@@ -10,10 +10,15 @@ class AsyncObject(object):
         self._loop = kwargs.pop("loop", asyncio.get_event_loop())
         self._tasks = {}
         self._cancelled = asyncio.Event(loop=self._loop)
+        self._done = asyncio.Event(loop=self._loop)
 
     @property
     def tasks(self):
         return self._tasks.keys()
+
+    @property
+    def done(self):
+        return self._done.is_set()
 
     @property
     def pending_tasks(self):
@@ -39,6 +44,10 @@ class AsyncObject(object):
         if not task.done():
             return task.cancel()
         return task.done()
+
+    async def wait_for(self, fut, timeout=None):
+        result = await asyncio.wait_for(fut, timeout, loop=self._loop)
+        return result
 
 def parse_cluster_id(cluster_id):
     try:
