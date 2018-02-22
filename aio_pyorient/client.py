@@ -99,7 +99,6 @@ class ODBClient(object):
         await self._sock.write(
             get_db_open_request(db_name, user, password, **kwargs)
         )
-        print("start reading response")
         await db_open_response(self)
 
         print(f"client db opened:")
