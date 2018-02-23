@@ -85,7 +85,7 @@ class Graph(object):
         self._last_cred = cred
         self._last_db = db_name
 
-        cluster_map = await self.client.db_open(db_name, user, cred)
+        cluster_map = await self.client.open_db(db_name, user, cred)
 
 
         self.server_version = ServerVersion(
@@ -109,7 +109,7 @@ class Graph(object):
             if last_db and last_db is not dropped_db:
                 # In case we aren't dropping the currently-configured database,
                 # ensure we are still able to use it.
-                await self.client.db_open(
+                await self.client.open_db(
                     last_db, self._last_user, self._last_cred
                 )
         return True

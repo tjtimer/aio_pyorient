@@ -32,7 +32,7 @@ class Open(BaseHandler):
         )
 
     async def read(self):
-        await self.read_header()
+        await self.read_header(with_token=False)  # returns status, old session_id, empty byte
         s_id, token = [
             await Integer.decode(self._sock), await Bytes.decode(self._sock)
         ]
@@ -42,3 +42,23 @@ class Open(BaseHandler):
         cluster_conf = await Bytes.decode(self._sock)
         server_version = await String.decode(self._sock)
         return self._result(s_id, token, cluster_list, cluster_conf, server_version)
+
+
+class Reload(BaseHandler):
+    _result = namedtuple(
+        "ReloadDbResponse",
+        "header, cluster"
+    )
+
+    def __init__(self, client, session_id: int, auth_token: bytes):
+        super().__init__(
+            client,
+            (RequestHeader, (3, session_id, auth_token))
+        )
+
+    async def read(self):
+        header = await self.read_header()
+        cluster_list = []
+        async for cluster in self.read_clusters():
+            cluster_list.append(cluster)
+        return self._result(header, cluster_list)

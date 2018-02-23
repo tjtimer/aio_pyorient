@@ -3,7 +3,7 @@ async def test_connect(client):
     assert session_id >= 0
 
 async def test_db_open(client):
-    info, clusters, node_list = await client.db_open(
+    info, clusters, node_list = await client.open_db(
         "tjs-test", "root", "orient-pw"
     )
     assert info is not None

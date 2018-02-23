@@ -28,7 +28,7 @@ class Connect(BaseHandler):
         )
 
     async def read(self):
-        await self.read_header()
+        await self.read_header(with_token=False)  # returns status, old session_id, empty byte
         _result = [
             await Integer.decode(self._sock), await Bytes.decode(self._sock)
         ]
