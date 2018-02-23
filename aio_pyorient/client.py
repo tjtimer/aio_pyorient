@@ -2,6 +2,7 @@ import asyncio
 
 from aio_pyorient.handler import db, server
 from aio_pyorient.sock import ODBSocket
+from aio_pyorient.utils import AsyncObject
 
 try:
     import uvloop
@@ -10,13 +11,12 @@ except ImportError:
     pass
 
 
-class ODBClient:
+class ODBClient(AsyncObject):
 
     def __init__(self,
                  host: str = 'localhost',
-                 port: int = 2424, *,
-                 loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()):
-        self._loop = loop
+                 port: int = 2424, **kwargs):
+        super().__init__(**kwargs)
         self._sock = ODBSocket(
             host=host, port=port,
             loop=self._loop

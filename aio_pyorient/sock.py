@@ -3,6 +3,7 @@ import struct
 
 from aio_pyorient.constants import SUPPORTED_PROTOCOL
 from aio_pyorient.exceptions import (PyOrientWrongProtocolVersionException)
+from aio_pyorient.handler.base import ODBSignal
 from aio_pyorient.utils import AsyncObject
 
 
@@ -12,10 +13,12 @@ class ODBSocket(AsyncObject):
                  host: str="localhost", port: int=2424,
                  **kwargs):
         super().__init__(**kwargs)
-        self._connected = asyncio.Event(loop=self._loop)
-        self._sent = asyncio.Event(loop=self._loop)
         self._host = host
         self._port = port
+        self._connected = asyncio.Event(loop=self._loop)
+        self._sent = asyncio.Event(loop=self._loop)
+        self._on_connect = ODBSignal(self)
+        self._on_close = ODBSignal(self)
         self._reader, self._writer = None, None
         self._protocol = None
         self._in_transaction = False
@@ -54,13 +57,15 @@ class ODBSocket(AsyncObject):
                 "Protocol version " + str(self.protocol) +
                 " is not supported yet by this client.", [])
         self._connected.set()
+        await self._on_connect.send(self)
 
-    def close(self):
+    async def close(self):
         self._connected.clear()
         self._writer.close()
         self._host = ""
         self._port = 0
         self._protocol = None
+        await self._on_close.send(self)
 
     async def send(self, buff):
         await self._connected.wait()

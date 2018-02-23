@@ -34,10 +34,11 @@ class AsyncObject(object):
         return self._tasks[name]
 
     def cancel(self):
+        self._cancelled.set()
         for task in self._tasks.values():
             if not task.done():
                 task.cancel()
-        self._cancelled.set()
+        self._done.set()
 
     def cancel_task(self, name: str = ''):
         task = self._tasks[name]

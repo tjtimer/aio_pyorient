@@ -4,7 +4,6 @@ import struct
 from collections import namedtuple
 
 from aio_pyorient.constants import NAME, SUPPORTED_PROTOCOL, VERSION
-from aio_pyorient.handler.fields import Byte, Bytes, Integer, Short, String
 from aio_pyorient.utils import AsyncObject
 
 int_packer = struct.Struct("!i")
@@ -172,26 +171,47 @@ class RequestHeader:
         return header + Bytes.encode(arg[2])
 
 
-class ODBSignal:
+class ODBSignal(AsyncObject):
 
-    def __init__(self):
+    def __init__(self, handler, extra=None):
+        super().__init__(loop=handler._loop)
+        self._handler = handler
         self._subscribers = []
+        self._extra = extra
 
-    def __call__(self, coro, *args, **kwargs):
+    @property
+    def payload(self):
+        if self._extra:
+            return f"{self._handler._name} instance plus {self._extra}"
+        return f"{self._handler._name} instance"
+
+    def __call__(self, coro):
         assert inspect.isawaitable(coro), \
             "First argument must be awaitable, e.g. coroutine or future."
-        self._subscribers.append((coro, args, kwargs))
+        self._subscribers.append(coro)
 
-    async def send(self, handler):
-        await asyncio.gather(
-            *(sub[0](handler, *sub[1], **sub[2])
-              for sub in self._subscribers)
-        )
-
+    async def send(self, handler, *extra):
+        print("signal sending", handler._name)
+        for sub in self._subscribers:
+            self.create_task(
+                sub, handler, *extra
+            )
+        self._done.set()
 
 class BaseHandler(AsyncObject):
+    @classmethod
+    def __init_subclass__(cls):
+        cls._name = f"{cls.__module__.capitalize()}{cls.__name__}"
 
-    def __init__(self, client, *args):
+    def __init__(self, client, *args,
+                 ows_extra_payload=None,
+                 ods_extra_payload=None,
+                 owr_extra_payload=None,
+                 odr_extra_payload=None,
+                 no_ows=False,
+                 no_ods=False,
+                 no_owr=False,
+                 no_odr=False):
         super().__init__(loop=client._loop)
         self._sent = asyncio.Event(loop=self._loop)
         self._client = client
@@ -200,24 +220,42 @@ class BaseHandler(AsyncObject):
             field_type.encode(value)
             for field_type, value in args
         )
-        self.before_send = ODBSignal()
-        self.before_read = ODBSignal()
-        self.on_done = ODBSignal()
+        self.on_will_send = ODBSignal(self, ows_extra_payload)
+        self.on_will_read = ODBSignal(self, ods_extra_payload)
+        self.on_did_send = ODBSignal(self, owr_extra_payload)
+        self.on_did_read = ODBSignal(self, odr_extra_payload)
+        self._ows_disabled = no_ows
+        self._ods_disabled = no_ods
+        self._owr_disabled = no_owr
+        self._odr_disabled = no_odr
         self.response = None
 
-    async def _on_done(self):
-        await self._done.wait()
-        self.on_done.send(self)
+
+    async def _wrap_send(self):
+        if not self._ows_disabled:
+            await self.on_will_send.send(self)
+        try:
+            return await self.send()
+        finally:
+            if not self._ods_disabled:
+                await self.on_did_send.send(self)
+
+    async def _wrap_read(self):
+        if not self._owr_disabled:
+            await self.on_will_read.send(self)
+        try:
+            return await self.read()
+        finally:
+            if not self._odr_disabled:
+                await self.on_did_read.send(self)
 
     async def send(self):
-        await self.before_send.send(self)
         await self._sock.send(self._request)
         self._sent.set()
         return self
 
     async def read_header(self, with_token: bool = True):
         await self._sent.wait()
-        await self.before_read.send(self)
         status = await Byte.decode(self._sock)
         s_id = await Integer.decode(self._sock)
         auth_token = b''
@@ -230,3 +268,6 @@ class BaseHandler(AsyncObject):
     async def read_clusters(self):
         for _ in range(await Short.decode(self._sock)):
             yield ODBCluster(await String.decode(self._sock), await Short.decode(self._sock))
+
+    async def read(self):
+        pass
