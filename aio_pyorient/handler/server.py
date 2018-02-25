@@ -1,11 +1,8 @@
-from collections import namedtuple
-
 from aio_pyorient.handler.base import BaseHandler, Boolean, Bytes, Integer, Introduction, RequestHeader, String
+from aio_pyorient.handler.response_types import ServerConnectResponse
 from aio_pyorient.serializations import OrientSerialization
 
-
-class Connect(BaseHandler):
-    _result = namedtuple("ServerConnectResponse", "session_id, auth_token")
+class ServerConnect(BaseHandler):
 
     def __init__(
             self, client, user: str, password: str, *,
@@ -32,4 +29,4 @@ class Connect(BaseHandler):
         _result = [
             await Integer.decode(self._sock), await Bytes.decode(self._sock)
         ]
-        return self._result(*_result)
+        return self.response_type(*_result)

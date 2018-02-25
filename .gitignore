@@ -41,3 +41,5 @@ wiki
 *.zip
 cover
 venv
+aio_pyorient/local_settings.py
+tests/test_settings.py

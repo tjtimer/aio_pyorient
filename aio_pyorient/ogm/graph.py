@@ -63,7 +63,7 @@ class Graph(object):
         self.strict = strict
 
     async def open(self, db_name, storage, user=None, cred=None):
-        """Open a graph on currently-connected database.
+        """OpenDb a graph on currently-connected database.
 
         :param storage: Either 'plocal' or 'memory'
         """

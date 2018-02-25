@@ -1,16 +1,49 @@
 import asyncio
+import inspect
 import typing
+from collections import namedtuple
 
 from aio_pyorient.otypes import OrientRecordLink
 
+ODBSignalPayload = namedtuple('ODBSignalPayload', 'sender, extra')
 
-class AsyncObject(object):
+class ODBSignal:
+
+    def __init__(self, sender, extra_type=None):
+        self._sender = sender
+        self._extra_type = extra_type
+        self._receiver = []
+
+    @property
+    def payload(self):
+        return ODBSignalPayload(self._sender, self._extra_type)
+
+    def __call__(self, coro):
+        assert inspect.isawaitable(coro), \
+            "First argument must be awaitable, e.g. coroutine or future."
+        self._receiver.append(coro)
+
+    async def send(self, sender=None, extra=None):
+        sender = sender if sender else self._sender
+        has_extra = self._extra_type is not None and extra is not None
+        if has_extra and not isinstance(extra, self._extra_type):
+            extra = self._extra_type(*extra)
+        return await asyncio.gather(
+            *(coro(ODBSignalPayload(sender, extra)) for coro in self._receiver)
+        )
+
+
+class AsyncBase:
 
     def __init__(self, **kwargs):
         self._loop = kwargs.pop("loop", asyncio.get_event_loop())
         self._tasks = {}
         self._cancelled = asyncio.Event(loop=self._loop)
         self._done = asyncio.Event(loop=self._loop)
+
+    @property
+    def name(self):
+        return self.__class__.__name__
 
     @property
     def tasks(self):
@@ -26,21 +59,19 @@ class AsyncObject(object):
 
     def create_task(self,
                     coro: typing.Callable,
-                    *coro_args: tuple or list,
-                    name: str = None):
-        name = name if name else coro.__name__
+                    *coro_args: tuple or list):
         _task = self._loop.create_task(coro(*coro_args))
-        self._tasks[name] = _task
-        return self._tasks[name]
+        self._tasks[coro.__name__] = _task
+        return _task
 
-    def cancel(self):
+    async def cancel(self):
         self._cancelled.set()
         for task in self._tasks.values():
             if not task.done():
                 task.cancel()
         self._done.set()
 
-    def cancel_task(self, name: str = ''):
+    async def cancel_task(self, name: str = ''):
         task = self._tasks[name]
         if not task.done():
             return task.cancel()
@@ -50,43 +81,9 @@ class AsyncObject(object):
         result = await asyncio.wait_for(fut, timeout, loop=self._loop)
         return result
 
-def parse_cluster_id(cluster_id):
-    try:
+    async def __aenter__(self):
+        return self
 
-        if isinstance(cluster_id, str):
-            pass
-        elif isinstance(cluster_id, int):
-            cluster_id = str(cluster_id)
-        elif isinstance( cluster_id, bytes ):
-            cluster_id = cluster_id.decode("utf-8")
-        elif isinstance( cluster_id, OrientRecordLink ):
-            cluster_id = cluster_id.get()
-
-        _cluster_id, _position = cluster_id.split( ':' )
-        if _cluster_id[0] is '#':
-            _cluster_id = _cluster_id[1:]
-    except (AttributeError, ValueError):
-        # String but with no ":"
-        # so treat it as one param
-        _cluster_id = cluster_id
-    return _cluster_id
-
-
-def parse_cluster_position(_cluster_position):
-    try:
-
-        if isinstance(_cluster_position, str):
-            pass
-        elif isinstance(_cluster_position, int):
-            _cluster_position = str(_cluster_position)
-        elif isinstance( _cluster_position, bytes ):
-            _cluster_position = _cluster_position.decode("utf-8")
-        elif isinstance( _cluster_position, OrientRecordLink ):
-            _cluster_position = _cluster_position.get()
-
-        _cluster, _position = _cluster_position.split( ':' )
-    except (AttributeError, ValueError):
-        # String but with no ":"
-        # so treat it as one param
-        _position = _cluster_position
-    return _position
+    async def __aexit__(self, *exc_args):
+        self._done.set()
+        return

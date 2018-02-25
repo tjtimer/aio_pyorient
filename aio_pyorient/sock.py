@@ -3,11 +3,10 @@ import struct
 
 from aio_pyorient.constants import SUPPORTED_PROTOCOL
 from aio_pyorient.exceptions import (PyOrientWrongProtocolVersionException)
-from aio_pyorient.handler.base import ODBSignal
-from aio_pyorient.utils import AsyncObject
+from aio_pyorient.utils import AsyncBase, ODBSignal
 
 
-class ODBSocket(AsyncObject):
+class ODBSocket(AsyncBase):
 
     def __init__(self, *,
                  host: str="localhost", port: int=2424,
