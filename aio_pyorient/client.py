@@ -1,6 +1,7 @@
 import asyncio
 
 from aio_pyorient.handler import db, server
+from aio_pyorient.serializations import OrientSerialization, OrientSerializationBinary, OrientSerializationCSV
 from aio_pyorient.sock import ODBSocket
 from aio_pyorient.utils import AsyncBase
 
@@ -21,10 +22,23 @@ class ODBClient(AsyncBase):
             host=host, port=port,
             loop=self._loop
         )
+        self._session_id = kwargs.pop("session_id", -1)
+        self._auth_token = kwargs.pop("auth_token", b'')
+        self._db_name = kwargs.pop("db_name", None)
+        self._clusters = kwargs.pop("clusters", None)
+        self._serialization_type = kwargs.pop("serialization_type", OrientSerialization.CSV)
+        if self._serialization_type is OrientSerialization.CSV:
+            self._serializer = OrientSerializationCSV
+        else:
+            self._serializer = OrientSerializationBinary
 
     @property
     def is_ready(self):
         return self._sock.connected
+
+    @property
+    def clusters(self):
+        return self._clusters
 
     @property
     def _cluster_map(self):

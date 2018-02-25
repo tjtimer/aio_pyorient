@@ -16,8 +16,6 @@ class ODBSocket(AsyncBase):
         self._port = port
         self._connected = asyncio.Event(loop=self._loop)
         self._sent = asyncio.Event(loop=self._loop)
-        self._on_connect = ODBSignal(self)
-        self._on_close = ODBSignal(self)
         self._reader, self._writer = None, None
         self._protocol = None
         self._in_transaction = False
@@ -56,7 +54,6 @@ class ODBSocket(AsyncBase):
                 "Protocol version " + str(self.protocol) +
                 " is not supported yet by this client.", [])
         self._connected.set()
-        await self._on_connect.send(self)
 
     async def close(self):
         self._connected.clear()
@@ -64,7 +61,6 @@ class ODBSocket(AsyncBase):
         self._host = ""
         self._port = 0
         self._protocol = None
-        await self._on_close.send(self)
 
     async def send(self, buff):
         await self._connected.wait()

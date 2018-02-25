@@ -5,6 +5,7 @@ from collections import namedtuple
 from aio_pyorient.constants import NAME, SUPPORTED_PROTOCOL, VERSION
 from aio_pyorient.handler import response_types
 from aio_pyorient.handler.response_types import ErrorResponse
+from aio_pyorient.otypes import OrientRecord, OrientRecordLink
 from aio_pyorient.utils import AsyncBase, ODBSignal
 
 int_packer = struct.Struct("!i")
@@ -15,11 +16,12 @@ long_packer = struct.Struct("!q")
 SUCCESS = 0
 ERROR = 1
 PUSH = 3
+class ODBRequestError(BaseException):
+    pass
 
 ODBRecord = namedtuple("ODBRecord", "type, id, version, content")
 ODBCluster = namedtuple('ODBCluster', 'name, id')
 ODBException = namedtuple("ODBException", "class_name, message")
-ODBResponseHeader = namedtuple('ODBResponseHeader', 'status, session_id, auth_token')
 
 class Boolean:
     @staticmethod
@@ -55,6 +57,17 @@ class Bytes:
         if _len > 0:
             value = await sock.recv(_len)
         return value
+
+
+class Char:
+    @staticmethod
+    def encode(value):
+        return bytes(value, encoding="utf-8")
+
+    @staticmethod
+    async def decode(sock):
+        value = await sock.recv(1)
+        return value.decode()
 
 
 class String:
@@ -130,7 +143,7 @@ class Record:
 
     @staticmethod
     async def decode(sock):
-        r_type = str(await Byte.decode(sock))
+        r_type = await Char.decode(sock)
         r_id = await RecordId.decode(sock)
         r_version = await Integer.decode(sock)
         r_content = await Bytes.decode(sock)
@@ -200,6 +213,7 @@ class BaseHandler(AsyncBase):
         self._sent = asyncio.Event(loop=self._loop)
         self._client = client
         self._sock = client._sock
+        self._serializer = client._serializer
         self._request = b''.join(
             field_type.encode(value)
             for field_type, value in args
@@ -224,6 +238,8 @@ class BaseHandler(AsyncBase):
         try:
             self.__response = await self._read()
             return self.response
+        except ODBRequestError:
+            return await self.read_error()
         finally:
             self._done.set()
             if not self._odr_disabled:
@@ -244,27 +260,18 @@ class BaseHandler(AsyncBase):
         await self._sent.wait()
         status = await Byte.decode(self._sock)
         if status is ERROR:
-            return await self.read_error()
+            raise ODBRequestError(f"{self.name} received error.")
         if status is PUSH:
             return "PUSH MESSAGE"
         s_id = await Integer.decode(self._sock)
         auth_token = b''
         if with_token:
             auth_token = await Bytes.decode(self._sock)
-        return ODBResponseHeader(
-            status, s_id, auth_token
-        )
+        return s_id, auth_token
 
     async def read_clusters(self):
         for _ in range(await Short.decode(self._sock)):
             yield ODBCluster(await String.decode(self._sock), await Short.decode(self._sock))
-
-    async def _read(self):
-        """
-        Overwrite this method if you want on_before_read
-        and on_did_read signals to be send.
-        """
-        pass
 
     async def read_error(self):
         response = ()
@@ -277,3 +284,10 @@ class BaseHandler(AsyncBase):
                             await String.decode(self._sock)
                         )
         return ErrorResponse(response)
+
+    async def _read(self):
+        """
+        Overwrite this method if you want on_before_read
+        and on_did_read signals to be send.
+        """
+        pass

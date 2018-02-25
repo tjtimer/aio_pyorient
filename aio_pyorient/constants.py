@@ -157,3 +157,7 @@ SOCK_CONN_TIMEOUT = 30
 REQUEST_SUCCESS = 0
 REQUEST_ERROR = 1
 REQUEST_PUSH = 3
+
+class ODBSerialization:
+    CSV = "ORecordDocument2csv"
+    Binary = "ORecordSerializerBinary"
