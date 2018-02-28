@@ -1,10 +1,19 @@
-from aio_pyorient.handler.base import BaseHandler, Boolean, Bytes, Integer, Introduction, RequestHeader, String, Long
+from aio_pyorient.handler.base import (
+    BaseHandler, Boolean, Bytes, Integer, Introduction, RequestHeader, String, Long
+)
+from aio_pyorient.otypes import ODBCluster
 from aio_pyorient.handler.response_types import OpenDbResponse, ReloadDbResponse
 from aio_pyorient.serializations import OrientSerialization
 
+class DbBaseHandler(BaseHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
+    async def read_clusters(self):
+        for _ in range(await self.read_short()):
+            yield ODBCluster(await self.read_string(), await self.read_short())
 
-class OpenDb(BaseHandler):
+class OpenDb(DbBaseHandler):
 
     def __init__(
             self, client, db_name: str, user: str, password: str, *,
@@ -12,7 +21,8 @@ class OpenDb(BaseHandler):
             serialization_type: OrientSerialization = OrientSerialization.CSV,
             use_token_auth: bool = True,
             support_push: bool = True,
-            collect_stats: bool = True):
+            collect_stats: bool = True,
+            **kwargs):
         super().__init__(
             client,
             (RequestHeader, (3, -1)),
@@ -24,24 +34,23 @@ class OpenDb(BaseHandler):
             (Boolean, collect_stats),
             (String, db_name),
             (String, user),
-            (String, password)
+            (String, password),
+            **kwargs
         )
+        self._db_name = db_name
 
     async def _read(self):
         await self.read_header(with_token=False)  # returns status, old session_id, empty byte
-        s_id, token = [
-            await Integer.decode(self._sock), await Bytes.decode(self._sock)
-        ]
-        cluster_list = []
+        self._client._session_id = await self.read_int()
+        self._client._auth_token = await self.read_bytes()
         async for cluster in self.read_clusters():
-            cluster_list.append(cluster)
-        cluster_conf = await Bytes.decode(self._sock)
-        server_version = await String.decode(self._sock)
-        return self.response_type(s_id, token, cluster_list, cluster_conf, server_version)
+            self._client._clusters.append(cluster)
+        self._client._cluster_conf = await self.read_bytes()
+        self._client._server_version = await self.read_string()
+        self._client._db_name = self._db_name
+        return self._client
 
-
-
-class ReloadDb(BaseHandler):
+class ReloadDb(DbBaseHandler):
 
     def __init__(self, client, session_id: int, auth_token: bytes):
         super().__init__(
@@ -50,13 +59,11 @@ class ReloadDb(BaseHandler):
         )
 
     async def _read(self):
-        header = await self.read_header()
-        cluster_list = []
+        self._client._session_id = await self.read_int()
+        self._client._auth_token = await self.read_bytes()
         async for cluster in self.read_clusters():
-            cluster_list.append(cluster)
-        return self.response_type(header, cluster_list)
-
-
+            self._client._clusters.append(cluster)
+        return self._client
 
 class CreateDb(BaseHandler):
 
@@ -76,10 +83,8 @@ class CreateDb(BaseHandler):
         )
 
     async def _read(self):
-        s_id, auth_token = await self.read_header()
-        return self.response_type(s_id, auth_token)
-
-
+        await self.read_header()
+        return self._client
 
 class DropDb(BaseHandler):
 
@@ -97,10 +102,8 @@ class DropDb(BaseHandler):
         )
 
     async def _read(self):
-        s_id, auth_token = await self.read_header()
-        return self.response_type(s_id, auth_token)
-
-
+        await self.read_header()
+        return self._client
 
 class DbExist(BaseHandler):
 
@@ -118,11 +121,8 @@ class DbExist(BaseHandler):
         )
 
     async def _read(self):
-        s_id, auth_token = await self.read_header()
-        exist = await Boolean.decode(self._sock)
-        return self.response_type(s_id, auth_token, exist)
-
-
+        await self.read_header()
+        return await self.read_bool()
 
 class DbSize(BaseHandler):
 
@@ -133,9 +133,8 @@ class DbSize(BaseHandler):
         )
 
     async def _read(self):
-        s_id, auth_token = await self.read_header()
-        size = await Long.decode(self._sock)
-        return self.response_type(s_id, auth_token, size)
+        await self.read_header()
+        return await self.read_long()
 
 
 
@@ -148,11 +147,8 @@ class DbRecordCount(BaseHandler):
         )
 
     async def _read(self):
-        s_id, auth_token = await self.read_header()
-        count = await Long.decode(self._sock)
-        return self.response_type(s_id, auth_token, count)
-
-
+        await self.read_header()
+        return await self.read_long()
 
 class CloseDb(BaseHandler):
 

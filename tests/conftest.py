@@ -15,6 +15,6 @@ def loop(request):
     return loop
 
 @pytest.fixture(scope="module")
-def client(loop):
-    client = ODBClient("localhost", 2424, loop=loop)
-    return client
+async def client(loop):
+    async with ODBClient("localhost", 2424, loop=loop) as client:
+        yield client

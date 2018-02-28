@@ -9,25 +9,23 @@ ODBSignalPayload = namedtuple('ODBSignalPayload', 'sender, extra')
 
 class ODBSignal:
 
-    def __init__(self, sender, extra_type=None):
+    def __init__(self, sender, extra=None):
         self._sender = sender
-        self._extra_type = extra_type
+        self._extra = extra
         self._receiver = []
 
     @property
     def payload(self):
-        return ODBSignalPayload(self._sender, self._extra_type)
+        return ODBSignalPayload(self._sender, self._extra)
 
     def __call__(self, coro):
-        assert inspect.isawaitable(coro), \
+        assert inspect.iscoroutinefunction(coro), \
             "First argument must be awaitable, e.g. coroutine or future."
         self._receiver.append(coro)
 
     async def send(self, sender=None, extra=None):
         sender = sender if sender else self._sender
-        has_extra = self._extra_type is not None and extra is not None
-        if has_extra and not isinstance(extra, self._extra_type):
-            extra = self._extra_type(*extra)
+        extra = self._extra if extra is None else extra
         return await asyncio.gather(
             *(coro(ODBSignalPayload(sender, extra)) for coro in self._receiver)
         )
@@ -81,9 +79,26 @@ class AsyncBase:
         result = await asyncio.wait_for(fut, timeout, loop=self._loop)
         return result
 
+class AsyncCtx(AsyncBase):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.on_close = ODBSignal(self)
+
+    async def close(self, *args, **kwargs):
+        if len(self.pending_tasks) > 0:
+            await self.cancel()
+        await self._close(*args, **kwargs)
+
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, *exc_args):
-        self._done.set()
+        await self.close()
+        return
+
+    async def _close(self, *args, **kwargs):
+        """
+        Overwrite this if you want pending tasks to be cancelled and
+        on_close signal to be send.
+        """
         return

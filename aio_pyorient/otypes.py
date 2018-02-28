@@ -1,7 +1,4 @@
-try:
-    basestring
-except NameError:
-    basestring = str
+from collections import namedtuple
 
 class OrientRecord(object):
     """
@@ -52,7 +49,7 @@ class OrientRecord(object):
                 # { '@my_class': { 'accommodation': 'hotel' } }
                 self.__o_class = key[1:]
                 for _key, _value in content[key].items():
-                    if isinstance(_value, basestring):
+                    if isinstance(_value, str):
                         self.__o_storage[_key] = self.addslashes( _value )
                     else:
                         self.__o_storage[_key] = _value
@@ -143,99 +140,6 @@ class OrientBinaryObject(object):
         import base64
         return base64.b64decode(self.b64)
 
-
-class OrientCluster(object):
-    def __init__(self, name, cluster_id, cluster_type=None, segment=None):
-        """
-        Information regarding a Cluster on the Orient Server
-        :param name: str name of the cluster
-        :param id: int id of the cluster
-        :param type: cluster type (only for version <24 of the protocol)
-        :param segment: cluster segment (only for version <24 of the protocol)
-        """
-        #: str name of the cluster
-        self.name = name
-        #: int idof the cluster
-        self.id = cluster_id
-        self.type = cluster_type
-        self.segment = segment
-
-    def __str__(self):
-        return "%s: %d" % (self.name, self.id)
-
-    def __eq__(self, other):
-        return self.name == other.name and self.id == other.id
-
-    def __ne__(self, other):
-        return self.name != other.name or self.id != other.id
-
-
-class OrientVersion(object):
-
-    def __init__(self, release):
-        """
-        Object representing Orient db release Version
-
-        :param release: String release
-        """
-
-        #: string full ODBClient release
-        self.release = release
-
-        #: Major version
-        self.major = None
-
-        #: Minor version
-        self.minor = None
-
-        #: build number
-        self.build = None
-
-        #: string build version
-        self.subversion = None
-
-        self._parse_version(release)
-
-    def _parse_version( self, string_release ):
-
-        import re
-        # if not isinstance(string_release, str):
-        #    string_release = string_release
-
-        try:
-            version_info = str(string_release).split( '.' )
-            self.major = version_info[0]
-            self.minor = version_info[1]
-            self.build = version_info[2]
-        except IndexError:
-            pass
-
-        regx = re.match('.*([0-9]+).*', self.major )
-        self.major = regx.group(1)
-
-        try:
-            _temp = self.minor.split( "-" )
-            self.minor = _temp[0]
-            self.subversion = _temp[1]
-        except IndexError:
-            pass
-
-        try:
-            regx = re.match( '([0-9]+)[\.\- ]*(.*)', self.build )
-            self.build = regx.group(1)
-            self.subversion = regx.group(2)
-        except TypeError:
-            pass
-
-        self.major = int( self.major )
-        self.minor = int( self.minor )
-        self.build = 0 if self.build is None else int( self.build )
-        self.subversion = '' if self.subversion is None else str( self.subversion )
-
-    def __str__(self):
-        return self.release
-
-
 class OrientNode(object):
     def __init__(self, node_dict=None):
         """
@@ -280,3 +184,17 @@ class OrientNode(object):
 
     def __str__(self):
         return self.name
+
+ODBRecord = namedtuple("ODBRecord", "type, id, version, content")
+ODBCluster = namedtuple('ODBCluster', 'name, id')
+ODBRequestErrorMessage = namedtuple("ODBException", "class_name, message")
+
+
+class ODBClusters(list):
+
+    def get(self, prop: int or str)->str or int:
+        cluster = [cl for cl in self if prop in cl][0]
+        if isinstance(prop, int):
+            return cluster.name
+        return cluster.id
+

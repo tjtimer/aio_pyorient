@@ -3,10 +3,10 @@ import struct
 
 from aio_pyorient.constants import SUPPORTED_PROTOCOL
 from aio_pyorient.exceptions import (PyOrientWrongProtocolVersionException)
-from aio_pyorient.utils import AsyncBase, ODBSignal
+from aio_pyorient.utils import AsyncCtx
 
 
-class ODBSocket(AsyncBase):
+class ODBSocket(AsyncCtx):
 
     def __init__(self, *,
                  host: str="localhost", port: int=2424,
@@ -17,7 +17,6 @@ class ODBSocket(AsyncBase):
         self._connected = asyncio.Event(loop=self._loop)
         self._sent = asyncio.Event(loop=self._loop)
         self._reader, self._writer = None, None
-        self._protocol = None
         self._in_transaction = False
         self._props = None
         self.create_task(
@@ -37,10 +36,6 @@ class ODBSocket(AsyncBase):
         return self._connected.is_set()
 
     @property
-    def protocol(self):
-        return self._protocol
-
-    @property
     def in_transaction(self):
         return self._in_transaction
 
@@ -48,19 +43,19 @@ class ODBSocket(AsyncBase):
         self._reader, self._writer = await asyncio.open_connection(
             self._host, self._port, loop=self._loop
         )
-        self._protocol = struct.unpack(">h", await self._reader.readexactly(2))[0]
-        if self.protocol > SUPPORTED_PROTOCOL:
+        protocol = struct.unpack(">h", await self._reader.readexactly(2))[0]
+        if protocol > SUPPORTED_PROTOCOL:
             raise PyOrientWrongProtocolVersionException(
-                "Protocol version " + str(self.protocol) +
+                "Protocol version " + str(protocol) +
                 " is not supported yet by this client.", [])
         self._connected.set()
+        return protocol
 
     async def close(self):
         self._connected.clear()
         self._writer.close()
         self._host = ""
         self._port = 0
-        self._protocol = None
 
     async def send(self, buff):
         await self._connected.wait()
