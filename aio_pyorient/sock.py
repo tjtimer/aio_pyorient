@@ -1,8 +1,7 @@
 import asyncio
 import struct
 
-from aio_pyorient.constants import SUPPORTED_PROTOCOL
-from aio_pyorient.exceptions import (PyOrientWrongProtocolVersionException)
+from aio_pyorient.odb_types import short_packer
 from aio_pyorient.utils import AsyncCtx
 
 
@@ -43,11 +42,7 @@ class ODBSocket(AsyncCtx):
         self._reader, self._writer = await asyncio.open_connection(
             self._host, self._port, loop=self._loop
         )
-        protocol = struct.unpack(">h", await self._reader.readexactly(2))[0]
-        if protocol > SUPPORTED_PROTOCOL:
-            raise PyOrientWrongProtocolVersionException(
-                "Protocol version " + str(protocol) +
-                " is not supported yet by this client.", [])
+        protocol = short_packer.unpack(await self._reader.readexactly(2))[0]
         self._connected.set()
         return protocol
 

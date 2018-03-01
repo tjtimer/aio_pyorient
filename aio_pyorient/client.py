@@ -2,7 +2,6 @@ import asyncio
 
 from aio_pyorient.handler import db, server
 from aio_pyorient.odb_types import ODBClusters
-from aio_pyorient.serializations import OrientSerialization, OrientSerializationBinary, OrientSerializationCSV
 from aio_pyorient.sock import ODBSocket
 from aio_pyorient.utils import AsyncCtx
 
@@ -33,7 +32,7 @@ class ODBClient(AsyncCtx):
         self._cluster_conf = kwargs.pop("cluster_conf", b'')
         self._server_version = kwargs.pop("server_version", '')
         self._protocol = None
-        self._serialization_type = OrientSerialization.CSV
+        self._serialization_type = "ORecordDocument2csv"
         self._is_ready = asyncio.Event(loop=self._loop)
 
     @property
