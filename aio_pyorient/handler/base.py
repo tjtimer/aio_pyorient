@@ -1,108 +1,25 @@
 import asyncio
-import struct
 
-from aio_pyorient.constants import NAME, SUPPORTED_PROTOCOL, VERSION
-from aio_pyorient.otypes import ODBRecord, ODBRequestErrorMessage
+from aio_pyorient.odb_types import (
+    Byte, Bytes, Char, String, Integer, Short, Long, ODBRecord, int_packer, long_packer,
+    short_packer,
+    ODBRequestErrorMessage
+)
 from aio_pyorient.utils import AsyncBase, ODBSignal
 
 
-int_packer = struct.Struct("!i")
-short_packer = struct.Struct("!h")
-long_packer = struct.Struct("!q")
+NAME = "ODB binary client (aio_pyorient)"
+VERSION = "0.0.1"
+SUPPORTED_PROTOCOL = 37
 
 # response status
 REQUEST_SUCCESS = 0
 REQUEST_ERROR = 1
 REQUEST_PUSH = 3
 
-class Boolean:
-    @staticmethod
-    def encode(value):
-        return bytes([1]) if value else bytes([0])
 
-    @staticmethod
-    async def decode(sock):
-        decoded = ord(await sock.recv(1)) is 1
-        return decoded
-
-class Byte:
-    @staticmethod
-    def encode(value):
-        return bytes([ord(value)])
-
-    @staticmethod
-    async def decode(sock):
-        decoded = ord(await sock.recv(1))
-        return decoded
-
-class Bytes:
-    @staticmethod
-    def encode(value):
-        return int_packer.pack(len(value)) + value
-
-    @staticmethod
-    async def decode(sock):
-        value = b''
-        _len = await Integer.decode(sock)
-        if _len > 0:
-            value = await sock.recv(_len)
-        return value
-
-class Char:
-    @staticmethod
-    def encode(value):
-        return bytes(value, encoding="utf-8")
-
-    @staticmethod
-    async def decode(sock):
-        value = await sock.recv(1)
-        return value.decode()
-
-class String:
-    @staticmethod
-    def encode(value):
-        encoded = int_packer.pack(len(value)) + bytes(value, encoding="utf-8")
-        return encoded
-
-    @staticmethod
-    async def decode(sock):
-        decoded = ""
-        _len = await Integer.decode(sock)
-        if _len > 0:
-            value = await sock.recv(_len)
-            decoded = value.decode("utf-8")
-        return decoded
-
-class Integer:
-    @staticmethod
-    def encode(value):
-        return int_packer.pack(value)
-
-    @staticmethod
-    async def decode(sock):
-        decoded = int_packer.unpack(await sock.recv(4))[0]
-        return decoded
-
-class Short:
-    @staticmethod
-    def encode(value):
-        return short_packer.pack(value)
-
-    @staticmethod
-    async def decode(sock):
-        decoded = short_packer.unpack(await sock.recv(2))[0]
-        return decoded
-
-class Long:
-    @staticmethod
-    def encode(value):
-        print("Long", value)
-        return long_packer.pack(value)
-
-    @staticmethod
-    async def decode(sock):
-        decoded = long_packer.unpack(await sock.recv(8))[0]
-        return decoded
+class ODBHandlerError(BaseException):
+    pass
 
 class RecordId:
     @staticmethod
@@ -150,6 +67,7 @@ class RequestHeader:
             return header
         return header + Bytes.encode(args[2])
 
+
 class BaseHandler(AsyncBase):
     """
     # BaseHandler
@@ -166,14 +84,19 @@ class BaseHandler(AsyncBase):
             def __init__(self, client, *args, **kwargs):
                 super().__init__(
                     client,
-                    (RequestHeader, (Oeration: int, session_id, auth_token)),
-                    (Field_1_Type, Field_1_Value),
+                    (RequestHeader, (
+                            Operation: int,
+                            client._session_id,
+                            client._auth_token)),
+                    (Type_Field_1, Value_Field_1),
+                    (Type_Field_2, Value_Field_2),
                     ...
+                    **kwargs
                 )
                 ...
 
             async def _read(self):
-                ...
+                # read field after field from socket
                 return response
     """
 
@@ -190,7 +113,6 @@ class BaseHandler(AsyncBase):
         self._sent = asyncio.Event(loop=self._loop)
         self._client = client
         self._sock = client._sock
-        self._serializer = client._serializer
         self._request = b''.join(
             field_type.encode(value)
             for field_type, value in fields
@@ -212,7 +134,7 @@ class BaseHandler(AsyncBase):
 
     async def read_bytes(self):
         value = b''
-        _len = await Integer.decode(self._sock)
+        _len = await self.read_int()
         if _len > 0:
             value = await self._sock.recv(_len)
         return value
@@ -221,16 +143,16 @@ class BaseHandler(AsyncBase):
         value = await self._sock.recv(1)
         return value.decode()
 
+    async def read_short(self):
+        decoded = short_packer.unpack(await self._sock.recv(2))[0]
+        return decoded
+
     async def read_int(self):
         decoded = int_packer.unpack(await self._sock.recv(4))[0]
         return decoded
 
     async def read_long(self):
-        decoded = long_packer.unpack(await self._sock.recv(2))[0]
-        return decoded
-
-    async def read_short(self):
-        decoded = short_packer.unpack(await self._sock.recv(2))[0]
+        decoded = long_packer.unpack(await self._sock.recv(8))[0]
         return decoded
 
     async def read_string(self):
@@ -246,12 +168,16 @@ class BaseHandler(AsyncBase):
             await self.on_will_read.send(self)
         try:
             return await self._read()
+        except ODBHandlerError:
+            return await  self.read_error()
         finally:
             self._done.set()
+            self._client._is_ready.set()
             if not self._odr_disabled:
                 await self.on_did_read.send(self)
 
     async def send(self):
+        self._client._is_ready.clear()
         if not self._ows_disabled:
             await self.on_will_send.send(self)
         try:
@@ -264,12 +190,11 @@ class BaseHandler(AsyncBase):
 
     async def read_header(self, with_token: bool = True):
         await self._sent.wait()
-        print("reader: ", self._sock._reader)
         status = await self.read_byte()
-        print("read status: ", status)
         if status is REQUEST_ERROR:
-            return (msg async for msg in self.read_error())
+            raise ODBHandlerError()
         if status is REQUEST_PUSH:
+            print("receiving push message")
             return "PUSH MESSAGE"
         self._client._session_id = await self.read_int()
         if with_token:
@@ -277,16 +202,18 @@ class BaseHandler(AsyncBase):
         return self._client
 
     async def read_error(self):
+        messages = []
         while True:
             more = await self.read_byte()
+            print("error more: ", more)
             if more is 0:
                 break
-            msg = ODBRequestErrorMessage(
+            messages.append(ODBRequestErrorMessage(
                 await self.read_string(),
                 await self.read_string()
-            )
-            yield msg
+            ))
         self._done.set()
+        return messages
 
     async def _read(self):
         """

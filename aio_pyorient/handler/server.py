@@ -1,11 +1,11 @@
-from aio_pyorient.handler.base import BaseHandler, Boolean, Introduction, RequestHeader, String
+from aio_pyorient.handler.base import BaseHandler, Introduction, RequestHeader
+from aio_pyorient.odb_types import Boolean, String
 
 
 class ServerConnect(BaseHandler):
 
     def __init__(
             self, client, user: str, password: str, *,
-            client_id: str = '',
             use_token_auth: bool = True,
             support_push: bool = True,
             collect_stats: bool = True,
@@ -14,7 +14,7 @@ class ServerConnect(BaseHandler):
             client,
             (RequestHeader, (2, -1)),
             (Introduction, None),
-            (String, client_id),
+            (String, client._id),
             (String, client._serialization_type),
             (Boolean, use_token_auth),
             (Boolean, support_push),

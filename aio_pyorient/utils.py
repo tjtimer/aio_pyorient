@@ -3,7 +3,6 @@ import inspect
 import typing
 from collections import namedtuple
 
-from aio_pyorient.otypes import OrientRecordLink
 
 ODBSignalPayload = namedtuple('ODBSignalPayload', 'sender, extra')
 
@@ -110,10 +109,10 @@ class AsyncCtx(AsyncBase):
                     self.on_close(sub)
             else: self.on_close(on_close)
 
-    async def close(self, *args, **kwargs):
+    async def _close(self, *args, **kwargs):
         try:
             await self.cancel()
-            await self._close(*args, **kwargs)
+            await self.close(*args, **kwargs)
             await self.on_close.send(self)
         finally:
             self._done.set()
@@ -123,10 +122,10 @@ class AsyncCtx(AsyncBase):
         return self
 
     async def __aexit__(self, *exc_args):
-        await self.close()
+        await self._close()
         return
 
-    async def _close(self, *args, **kwargs):
+    async def close(self, *args, **kwargs):
         """
         Overwrite this if you want pending tasks to be cancelled and
         on_close signal to be send.

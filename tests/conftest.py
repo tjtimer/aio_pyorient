@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from aio_pyorient import ODBClient
-from aio_pyorient.local_settings import TEST_DB, TEST_DB_PASSWORD, TEST_USER
+from .test_settings import TEST_DB, TEST_DB_PASSWORD, TEST_USER
 
 
 @pytest.fixture(scope="module")

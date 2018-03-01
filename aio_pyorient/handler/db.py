@@ -1,7 +1,9 @@
+from aio_pyorient.odb_types import ODBCluster
+
 from aio_pyorient.handler.base import (
-    BaseHandler, Boolean, Introduction, RequestHeader, String
+    BaseHandler, Introduction, RequestHeader
 )
-from aio_pyorient.otypes import ODBCluster
+from aio_pyorient.odb_types import Boolean, String
 
 
 class DbBaseHandler(BaseHandler):
@@ -136,8 +138,6 @@ class DbSize(BaseHandler):
         await self.read_header()
         return await self.read_long()
 
-
-
 class DbRecordCount(BaseHandler):
 
     def __init__(self, client, **kwargs):
@@ -161,4 +161,5 @@ class CloseDb(BaseHandler):
         )
 
     async def read(self):
-        return "Database closed!"
+        self._client._db_name = ''
+        return self._client

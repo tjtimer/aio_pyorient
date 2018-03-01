@@ -1,9 +1,8 @@
 import asyncio
 
-from aio_pyorient.utils import AsyncBase
+from aio_pyorient.utils import AsyncCtx
 
-
-class ODBPool(AsyncBase):
+class ODBPool(AsyncCtx):
     _clients = []
     min: int  # minimum clients in pool - default is 5
     max: int  # maximum clients in pool - default -1 meaning no limit

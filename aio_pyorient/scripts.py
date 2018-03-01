@@ -98,6 +98,8 @@ class ParamDefault(tuple):
         if l > 2:
             raise ValueError('Only a name, and (optionally) a '
                 'default value is valid for a parameter.')
-        return tuple.__new__(self, (pair[0].strip(),) +
-                                    ((pair[1],) if l > 1 else tuple()))
+        sec = ()
+        if l > 1:
+            sec = (pair[1],)
+        return tuple.__new__(self, (pair[0].strip(), sec))
 

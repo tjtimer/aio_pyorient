@@ -6,17 +6,14 @@ setup(
     url='https://github.com/tjtimer/aio_pyorient',
     author='Tim "tjtimer" Jedro',
     author_email='tjtimer@gmail.com',
-    description='async ODBClient client library',
+    description='async OrientDB client library for python',
     long_description=open('README.rst').read(),
     license='LICENSE',
     packages = [
         'aio_pyorient',
-        'aio_pyorient.messages',
-        'aio_pyorient.ogm',
     ],
     install_requires=[
         'pytest',
-        'pytest-aiohttp',
-        'pyorient_native'
+        'pytest-aiohttp'
     ]
 )

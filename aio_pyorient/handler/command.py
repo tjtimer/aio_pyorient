@@ -1,11 +1,11 @@
+import asyncio
 import inspect
 from typing import Callable
 
 from aio_pyorient.handler.base import (
-    BaseHandler, Byte, Bytes, Char, Integer, Link, Record, RequestHeader, Short, String,
-    Boolean
+    BaseHandler, RequestHeader
 )
-from aio_pyorient.otypes import OrientRecord, OrientRecordLink
+from aio_pyorient.odb_types import Bytes, Char, String, Integer, ODBRecord
 
 
 QUERY_SYNC    = "com.orientechnologies.orient.core.sql.query.OSQLSynchQuery"
@@ -18,6 +18,7 @@ QUERY_SCRIPT  = "com.orientechnologies.orient.core.command.script.OCommandScript
 
 class QueryCommand(BaseHandler):
     _callback = None
+    results = None
     def __init__(self,
                  client,
                  query: str,
@@ -27,8 +28,19 @@ class QueryCommand(BaseHandler):
                  mode: str='s',
                  callback: Callable=None,
                  **kwargs):
+
         if mode == 'a':
-            self.check_callback(callback)
+            self.results = asyncio.Queue(loop=self._loop)
+            command_type = QUERY_ASYNC
+            if not inspect.iscoroutinefunction(callback):
+                raise ValueError(
+                    """
+                    QueryCommand needs a coroutine function as callback 
+                    when mode set to 'a'!
+                    """
+                )
+            self._callback = callback
+        self._mode = mode
         if "LIMIT" in query.upper():
             limit = -1
         payload = b''.join([
@@ -45,43 +57,36 @@ class QueryCommand(BaseHandler):
             (Bytes, payload),
             **kwargs
         )
-        self._mode = mode
 
-    def check_callback(self, callback):
-        if not inspect.iscoroutinefunction(callback):
-            raise ValueError(
-                "QueryCommand needs a coroutine function as callback when mode set to 'a'!"
-            )
-        self._callback = callback
+    async def read_id(self):
+        c_id, pos = [await self.read_short(), await self.read_long()]
+        return f"#{c_id}:{pos}"
 
     async def read_record(self):
+        r_type = await self.read_char()
+        r_id = await self.read_id()
+        r_version = await self.read_int()
+        r_content = await self.read_bytes()
+        return ODBRecord(r_type, r_id, r_version, r_content)
+
+    async def read_next(self):
         marker = await self.read_short()
         if marker is -2:
             return None
         if marker is -3:
-            return OrientRecordLink(await Link.decode(self._sock))
-        record = await Record.decode(self._sock)
-        class_name, data = self._serializer.decode(record.content.rstrip())
-        return OrientRecord(
-            dict(
-                __o_storage=data,
-                __o_class=class_name,
-                __version=record.version,
-                __rid=record.id
-            )
-        )
+            return await self.read_id()
+        return await self.read_record()
 
     async def read_records_async(self):
-        records = ()
         while True:
             status = await self.read_byte()
             if status is 0:
                 break
-            record = await self.read_record()
+            record = await self.read_next()
             if status is 1:
-                records += (record,)
+                await self.results.put(record)
                 await self._callback(record)
-        return records
+        return self.results
 
     async def _read(self):
         await self.read_header()
@@ -92,16 +97,16 @@ class QueryCommand(BaseHandler):
         if result_type == 'n':
             await self.read_char()
         elif result_type in 'rw':
-            records = (await self.read_record(),)
+            records = (await self.read_next(),)
             await self.read_char()
             if result_type == 'w':
                 records = (
-                    self._serializer.decode(records[0].oRecordData['result']),
+                    records[0].data.decode().replace('result', ''),
                 )
         elif result_type == 'l':
             _len = await self.read_int()
             for _ in range(_len):
-                records += (await self.read_record(),)
+                records += (await self.read_next(),)
         elif result_type == 'i':
-            records, _ = await self.read_records_async()
-        return records
+            records = await self.read_records_async()
+        return (record for record in records)
