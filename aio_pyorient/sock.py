@@ -51,7 +51,7 @@ class ODBSocket(AsyncCtx):
         self._connected.set()
         return protocol
 
-    async def close(self):
+    async def _close(self):
         self._connected.clear()
         self._writer.close()
         self._host = ""
@@ -67,6 +67,6 @@ class ODBSocket(AsyncCtx):
 
     async def recv(self, _len_to_read):
         await self._sent.wait()
-        buf = await self._reader.read(_len_to_read)
-        self._reader.feed_data(buf)
+        buf = await self._reader.readexactly(_len_to_read)
+        # self._reader.feed_data(buf)
         return buf

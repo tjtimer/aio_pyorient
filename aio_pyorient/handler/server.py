@@ -1,32 +1,31 @@
-from aio_pyorient.handler.base import BaseHandler, Boolean, Bytes, Integer, Introduction, RequestHeader, String
-from aio_pyorient.handler.response_types import ServerConnectResponse
-from aio_pyorient.serializations import OrientSerialization
+from aio_pyorient.handler.base import BaseHandler, Boolean, Introduction, RequestHeader, String
+
 
 class ServerConnect(BaseHandler):
 
     def __init__(
             self, client, user: str, password: str, *,
             client_id: str = '',
-            serialization_type: OrientSerialization = OrientSerialization.CSV,
             use_token_auth: bool = True,
             support_push: bool = True,
-            collect_stats: bool = True):
+            collect_stats: bool = True,
+            **kwargs):
         super().__init__(
             client,
             (RequestHeader, (2, -1)),
             (Introduction, None),
             (String, client_id),
-            (String, serialization_type),
+            (String, client._serialization_type),
             (Boolean, use_token_auth),
             (Boolean, support_push),
             (Boolean, collect_stats),
             (String, user),
-            (String, password)
+            (String, password),
+            **kwargs
         )
 
-    async def read(self):
+    async def _read(self):
         await self.read_header(with_token=False)  # returns status, old session_id, empty byte
-        _result = [
-            await Integer.decode(self._sock), await Bytes.decode(self._sock)
-        ]
-        return self.response_type(*_result)
+        self._client._session_id = await self.read_int()
+        self._client._auth_token = await self.read_bytes()
+        return self._client

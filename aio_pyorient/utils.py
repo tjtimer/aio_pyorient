@@ -38,6 +38,7 @@ class AsyncBase:
         self._tasks = {}
         self._cancelled = asyncio.Event(loop=self._loop)
         self._done = asyncio.Event(loop=self._loop)
+        self._waiting = asyncio.Event(loop=self._loop)
 
     @property
     def name(self):
@@ -50,6 +51,10 @@ class AsyncBase:
     @property
     def done(self):
         return self._done.is_set()
+
+    @property
+    def waiting(self):
+        return self._waiting.is_set()
 
     @property
     def pending_tasks(self):
@@ -76,20 +81,45 @@ class AsyncBase:
         return task.done()
 
     async def wait_for(self, fut, timeout=None):
-        result = await asyncio.wait_for(fut, timeout, loop=self._loop)
-        return result
+        self._waiting.set()
+        try:
+            result = await asyncio.wait_for(fut, timeout, loop=self._loop)
+            return result
+        finally:
+            self._waiting.clear()
+
 
 class AsyncCtx(AsyncBase):
-    def __init__(self, **kwargs):
+    def __init__(self, *,
+                 on_open=None,
+                 on_close=None,
+                 oo_extra_payload=None,
+                 oc_extra_payload=None,
+                 **kwargs):
         super().__init__(**kwargs)
-        self.on_close = ODBSignal(self)
+        self.on_open = ODBSignal(self, oo_extra_payload)
+        self.on_close = ODBSignal(self, oc_extra_payload)
+        if on_open is not None:
+            if isinstance(on_open, (tuple, list)):
+                for sub in on_open:
+                    self.on_open(sub)
+            else: self.on_open(on_open)
+        if on_close is not None:
+            if isinstance(on_close, (tuple, list)):
+                for sub in on_close:
+                    self.on_close(sub)
+            else: self.on_close(on_close)
 
     async def close(self, *args, **kwargs):
-        if len(self.pending_tasks) > 0:
+        try:
             await self.cancel()
-        await self._close(*args, **kwargs)
+            await self._close(*args, **kwargs)
+            await self.on_close.send(self)
+        finally:
+            self._done.set()
 
     async def __aenter__(self):
+        await self.on_open.send(self)
         return self
 
     async def __aexit__(self, *exc_args):

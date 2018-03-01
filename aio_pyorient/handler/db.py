@@ -1,9 +1,8 @@
 from aio_pyorient.handler.base import (
-    BaseHandler, Boolean, Bytes, Integer, Introduction, RequestHeader, String, Long
+    BaseHandler, Boolean, Introduction, RequestHeader, String
 )
 from aio_pyorient.otypes import ODBCluster
-from aio_pyorient.handler.response_types import OpenDbResponse, ReloadDbResponse
-from aio_pyorient.serializations import OrientSerialization
+
 
 class DbBaseHandler(BaseHandler):
     def __init__(self, *args, **kwargs):
@@ -16,9 +15,9 @@ class DbBaseHandler(BaseHandler):
 class OpenDb(DbBaseHandler):
 
     def __init__(
-            self, client, db_name: str, user: str, password: str, *,
+            self, client,
+            db_name: str, user: str, password: str, *,
             client_id: str = '',
-            serialization_type: OrientSerialization = OrientSerialization.CSV,
             use_token_auth: bool = True,
             support_push: bool = True,
             collect_stats: bool = True,
@@ -28,7 +27,7 @@ class OpenDb(DbBaseHandler):
             (RequestHeader, (3, -1)),
             (Introduction, None),
             (String, client_id),
-            (String, serialization_type),
+            (String, client._serialization_type),
             (Boolean, use_token_auth),
             (Boolean, support_push),
             (Boolean, collect_stats),
@@ -52,13 +51,15 @@ class OpenDb(DbBaseHandler):
 
 class ReloadDb(DbBaseHandler):
 
-    def __init__(self, client, session_id: int, auth_token: bytes):
+    def __init__(self, client, **kwargs):
         super().__init__(
             client,
-            (RequestHeader, (73, session_id, auth_token))
+            (RequestHeader, (73, client._session_id, client._auth_token)),
+            **kwargs
         )
 
     async def _read(self):
+        self._client._clusters.clear()
         self._client._session_id = await self.read_int()
         self._client._auth_token = await self.read_bytes()
         async for cluster in self.read_clusters():
@@ -69,14 +70,12 @@ class CreateDb(BaseHandler):
 
     def __init__(self,
                  client,
-                 session_id: int,
-                 auth_token: bytes,
                  db_name: str,
                  db_type: str="graph",
                  storage_type: str="plocal"):
         super().__init__(
             client,
-            (RequestHeader, (4, session_id, auth_token)),
+            (RequestHeader, (4, client._session_id, client._auth_token)),
             (String, db_name),
             (String, db_type),
             (String, storage_type)
@@ -90,15 +89,15 @@ class DropDb(BaseHandler):
 
     def __init__(self,
                  client,
-                 session_id: int,
-                 auth_token: bytes,
                  db_name: str,
-                 storage_type: str="plocal"):
+                 storage_type: str="plocal",
+                 **kwargs):
         super().__init__(
             client,
-            (RequestHeader, (7, session_id, auth_token)),
+            (RequestHeader, (7, client._session_id, client._auth_token)),
             (String, db_name),
-            (String, storage_type)
+            (String, storage_type),
+            **kwargs
         )
 
     async def _read(self):
@@ -109,15 +108,15 @@ class DbExist(BaseHandler):
 
     def __init__(self,
                  client,
-                 session_id: int,
-                 auth_token: bytes,
                  db_name: str,
-                 storage_type: str):
+                 storage_type: str,
+                 **kwargs):
         super().__init__(
             client,
-            (RequestHeader, (6, session_id, auth_token)),
+            (RequestHeader, (6, client._session_id, client._auth_token)),
             (String, db_name),
-            (String, storage_type)
+            (String, storage_type),
+            **kwargs
         )
 
     async def _read(self):
@@ -126,10 +125,11 @@ class DbExist(BaseHandler):
 
 class DbSize(BaseHandler):
 
-    def __init__(self, client, session_id: int, auth_token: bytes):
+    def __init__(self, client, **kwargs):
         super().__init__(
             client,
-            (RequestHeader, (8, session_id, auth_token))
+            (RequestHeader, (8, client._session_id, client._auth_token)),
+            **kwargs
         )
 
     async def _read(self):
@@ -140,10 +140,11 @@ class DbSize(BaseHandler):
 
 class DbRecordCount(BaseHandler):
 
-    def __init__(self, client, session_id: int, auth_token: bytes):
+    def __init__(self, client, **kwargs):
         super().__init__(
             client,
-            (RequestHeader, (9, session_id, auth_token))
+            (RequestHeader, (9, client._session_id, client._auth_token)),
+            **kwargs
         )
 
     async def _read(self):
@@ -152,10 +153,11 @@ class DbRecordCount(BaseHandler):
 
 class CloseDb(BaseHandler):
 
-    def __init__(self, client, session_id: int, auth_token: bytes):
+    def __init__(self, client, **kwargs):
         super().__init__(
             client,
-            (RequestHeader, (5, session_id, auth_token))
+            (RequestHeader, (5, client._session_id, client._auth_token)),
+            **kwargs
         )
 
     async def read(self):

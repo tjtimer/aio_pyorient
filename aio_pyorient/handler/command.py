@@ -2,7 +2,8 @@ import inspect
 from typing import Callable
 
 from aio_pyorient.handler.base import (
-    BaseHandler, Byte, Bytes, Char, Integer, Link, Record, RequestHeader, Short, String
+    BaseHandler, Byte, Bytes, Char, Integer, Link, Record, RequestHeader, Short, String,
+    Boolean
 )
 from aio_pyorient.otypes import OrientRecord, OrientRecordLink
 
@@ -16,17 +17,16 @@ QUERY_SCRIPT  = "com.orientechnologies.orient.core.command.script.OCommandScript
 
 
 class QueryCommand(BaseHandler):
-
+    _callback = None
     def __init__(self,
                  client,
-                 session_id: int,
-                 auth_token: bytes,
                  query: str,
                  command_type: str=QUERY_CMD,
                  limit: int=25,
                  fetch_plan: str='*:0',
                  mode: str='s',
-                 callback: Callable=None):
+                 callback: Callable=None,
+                 **kwargs):
         if mode == 'a':
             self.check_callback(callback)
         if "LIMIT" in query.upper():
@@ -40,26 +40,22 @@ class QueryCommand(BaseHandler):
         ])
         super().__init__(
             client,
-            (RequestHeader, (41, session_id, auth_token)),
+            (RequestHeader, (41, client._session_id, client._auth_token)),
             (Char, mode),
-            (Integer, len(payload)),
-            (Bytes, payload)
+            (Bytes, payload),
+            **kwargs
         )
+        self._mode = mode
+
+    def check_callback(self, callback):
+        if not inspect.iscoroutinefunction(callback):
+            raise ValueError(
+                "QueryCommand needs a coroutine function as callback when mode set to 'a'!"
+            )
         self._callback = callback
 
-    @staticmethod
-    def check_callback(callback):
-        if callback is None:
-            raise ValueError("QueryCommand needs a callback when mode set to 'a'!")
-        is_func = inspect.isfunction(callback)
-        is_coro = inspect.iscoroutinefunction(callback)
-        if not is_func and not is_coro:
-            raise ValueError(
-                "QueryCommand callback must be a coroutine or a function!"
-            )
-
     async def read_record(self):
-        marker = await Short.decode(self._sock)
+        marker = await self.read_short()
         if marker is -2:
             return None
         if marker is -3:
@@ -76,41 +72,36 @@ class QueryCommand(BaseHandler):
         )
 
     async def read_records_async(self):
-        records = []
-        cached = []
+        records = ()
         while True:
-            status = await Byte.decode(self._sock)
+            status = await self.read_byte()
             if status is 0:
                 break
             record = await self.read_record()
             if status is 1:
-                records.append(record)
-                if inspect.isfunction(self._callback):
-                    self._callback(record)
-                else:
-                    await self._callback(record)
-            if status is 2:
-                cached.append(await self.read_record())
-        return records, cached
+                records += (record,)
+                await self._callback(record)
+        return records
 
     async def _read(self):
-        records, prefetched = (), None
-        s_id, auth_token = await self.read_header()
-        result_type = await Char.decode(self._sock)
+        await self.read_header()
+        if self._mode == 'a':
+            return await self.read_records_async()
+        records = ()
+        result_type = await self.read_char()
         if result_type == 'n':
-            await Char.decode(self._sock)
+            await self.read_char()
         elif result_type in 'rw':
             records = (await self.read_record(),)
-            await Char.decode(self._sock)
+            await self.read_char()
             if result_type == 'w':
                 records = (
                     self._serializer.decode(records[0].oRecordData['result']),
                 )
         elif result_type == 'l':
-            _len = await Integer.decode(self._sock)
+            _len = await self.read_int()
             for _ in range(_len):
                 records += (await self.read_record(),)
-            prefetched = await self.read_records_async()
         elif result_type == 'i':
-            records, cached = await self.read_records_async()
-        return self.response_type(s_id, auth_token, records, prefetched)
+            records, _ = await self.read_records_async()
+        return records

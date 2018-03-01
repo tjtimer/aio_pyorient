@@ -2,10 +2,9 @@ import asyncio
 import struct
 
 from aio_pyorient.constants import NAME, SUPPORTED_PROTOCOL, VERSION
-from aio_pyorient.handler import response_types
-from aio_pyorient.handler.response_types import ErrorResponse
-from aio_pyorient.otypes import ODBRecord, ODBCluster, ODBRequestErrorMessage
+from aio_pyorient.otypes import ODBRecord, ODBRequestErrorMessage
 from aio_pyorient.utils import AsyncBase, ODBSignal
+
 
 int_packer = struct.Struct("!i")
 short_packer = struct.Struct("!h")
@@ -102,7 +101,7 @@ class Long:
 
     @staticmethod
     async def decode(sock):
-        decoded = long_packer.unpack(await sock.recv(2))[0]
+        decoded = long_packer.unpack(await sock.recv(8))[0]
         return decoded
 
 class RecordId:
@@ -178,7 +177,7 @@ class BaseHandler(AsyncBase):
                 return response
     """
 
-    def __init__(self, client, *args,
+    def __init__(self, client, *fields,
                  ows_extra_payload=None,
                  ods_extra_payload=None,
                  owr_extra_payload=None,
@@ -194,7 +193,7 @@ class BaseHandler(AsyncBase):
         self._serializer = client._serializer
         self._request = b''.join(
             field_type.encode(value)
-            for field_type, value in args
+            for field_type, value in fields
         )
         self.on_will_send = ODBSignal(self, ows_extra_payload)
         self.on_will_read = ODBSignal(self, ods_extra_payload)
@@ -265,7 +264,9 @@ class BaseHandler(AsyncBase):
 
     async def read_header(self, with_token: bool = True):
         await self._sent.wait()
+        print("reader: ", self._sock._reader)
         status = await self.read_byte()
+        print("read status: ", status)
         if status is REQUEST_ERROR:
             return (msg async for msg in self.read_error())
         if status is REQUEST_PUSH:

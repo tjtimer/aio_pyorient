@@ -34,9 +34,9 @@ class ODBClient(AsyncCtx):
         self._protocol = None
         self._serialization_type = kwargs.pop("serialization_type", OrientSerialization.CSV)
         if self._serialization_type is OrientSerialization.CSV:
-            self._serializer = OrientSerializationCSV
+            self._serializer = OrientSerializationCSV()
         else:
-            self._serializer = OrientSerializationBinary
+            self._serializer = OrientSerializationBinary()
 
     @property
     def is_ready(self):
@@ -70,14 +70,8 @@ class ODBClient(AsyncCtx):
     def server_version(self):
         return self._server_version
 
-    async def close(self):
+    async def _close(self):
         await self._sock.close()
-
-    def get_class_position(self, cluster_name):
-        return self._clusters.get(cluster_name)
-
-    def get_class_name(self, position):
-        return self._clusters.get(position)
 
     async def connect(self, user: str, password: str, **kwargs):
         request = await server.ServerConnect(self, user, password, **kwargs).send()
@@ -85,9 +79,8 @@ class ODBClient(AsyncCtx):
 
     async def open_db(self, db_name: str, user: str, password: str, **kwargs):
         request = await db.OpenDb(self, db_name, user, password, **kwargs).send()
-        response = await request.read()
-        self._db_name = db_name
-        return response
+        await request.read()
+        return self
 
     async def reload_db(self, session_id: int, auth_token: bytes):
         request = await db.ReloadDb(self, session_id, auth_token).send()
