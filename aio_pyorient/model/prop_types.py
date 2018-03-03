@@ -23,9 +23,10 @@ PROPERTY_ATTRIBUTES = {
 class PropType:
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
-            assert str(k) in PROPERTY_ATTRIBUTES.keys(), \
+            attr = str(k).upper()
+            assert attr in PROPERTY_ATTRIBUTES.keys(), \
                 f'{k} is not a valid attribute'
-            assert isinstance(v, PROPERTY_ATTRIBUTES[str(k)]), \
+            assert isinstance(v, PROPERTY_ATTRIBUTES[attr]), \
                 f'{v} is not a valid value for attribute {k}'
             self.__setattr__(k, v)
 
