@@ -1,3 +1,3 @@
-TEST_DB = "tjs-test"
-TEST_USER = "root"
-TEST_DB_PASSWORD = "orient-pw"
+DB_NAME = "tjs-test"
+USER = "root"
+PASSWORD = "orient-pw"
