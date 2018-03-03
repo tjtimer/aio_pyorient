@@ -6,11 +6,11 @@ import asyncio
 from pprint import pprint
 
 from aio_pyorient.pool import ODBPool
-from tests.test_settings import TEST_PASSWORD, TEST_USER
+from tests.test_settings import TEST_PASSWORD, TEST_USER, TEST_DB
 
 
 async def test_pool(loop):
-    async with ODBPool(TEST_USER, TEST_PASSWORD, loop=loop) as pool:
+    async with ODBPool(TEST_USER, TEST_PASSWORD, db_name=TEST_DB, loop=loop) as pool:
         assert pool.min is 5
         assert pool.max == 30000
         assert not pool.is_full
