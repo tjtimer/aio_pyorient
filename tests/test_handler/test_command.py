@@ -3,15 +3,18 @@
  test_command
 """
 
-from aio_pyorient.handler.command import QueryCommand
+from aio_pyorient.handler.command import Query
+from aio_pyorient.model.base import InitCommands
 
 
-async def test_command(db_client):
-    handler = QueryCommand(
+async def test_db_command(db_client):
+    handler = Query(
         db_client,
-        """UPDATE #22:0 MERGE {'age': 32} RETURN AFTER @this"""
+        """select from person"""
     )
     await handler.send()
     response = await handler.read()
-    print("response: ", list(response))
+    print("response:")
+    for item in response:
+        print(item)
     assert handler.done

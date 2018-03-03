@@ -74,13 +74,15 @@ class CreateDb(BaseHandler):
                  client,
                  db_name: str,
                  db_type: str="graph",
-                 storage_type: str="plocal"):
+                 storage_type: str="plocal",
+                 **kwargs):
         super().__init__(
             client,
             (RequestHeader, (4, client._session_id, client._auth_token)),
             (String, db_name),
             (String, db_type),
-            (String, storage_type)
+            (String, storage_type),
+            **kwargs
         )
 
     async def _read(self):

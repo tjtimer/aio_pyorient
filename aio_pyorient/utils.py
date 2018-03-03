@@ -3,6 +3,8 @@ import inspect
 import typing
 from collections import namedtuple
 
+import arrow as arrow
+
 
 ODBSignalPayload = namedtuple('ODBSignalPayload', 'sender, extra')
 
@@ -30,14 +32,36 @@ class ODBSignal:
         )
 
 
+class TaskCreationError(BaseException):
+    pass
+
+
 class AsyncBase:
 
-    def __init__(self, **kwargs):
-        self._loop = kwargs.pop("loop", asyncio.get_event_loop())
+    def __init__(self, *,
+                 on_setup=None,
+                 on_shutdown=None,
+                 on_setup_extra_payload=None,
+                 on_shutdown_extra_payload=None,
+                 **kwargs):
+        self._loop = kwargs.get("loop", asyncio.get_event_loop())
         self._tasks = {}
+        self._is_ready = asyncio.Event(loop=self._loop)
         self._cancelled = asyncio.Event(loop=self._loop)
         self._done = asyncio.Event(loop=self._loop)
         self._waiting = asyncio.Event(loop=self._loop)
+        self.on_setup = ODBSignal(self, on_setup_extra_payload)
+        self.on_shutdown = ODBSignal(self, on_shutdown_extra_payload)
+        if on_setup is not None:
+            if isinstance(on_setup, (tuple, list)):
+                for sub in on_setup:
+                    self.on_setup(sub)
+            else: self.on_setup(on_setup)
+        if on_shutdown is not None:
+            if isinstance(on_shutdown, (tuple, list)):
+                for sub in on_shutdown:
+                    self.on_shutdown(sub)
+            else: self.on_shutdown(on_shutdown)
 
     @property
     def name(self):
@@ -46,6 +70,9 @@ class AsyncBase:
     @property
     def tasks(self):
         return self._tasks.keys()
+    @property
+    def is_ready(self):
+        return self._is_ready.is_set()
 
     @property
     def done(self):
@@ -56,13 +83,38 @@ class AsyncBase:
         return self._waiting.is_set()
 
     @property
+    def cancelled(self):
+        return self._cancelled.is_set()
+
+    @property
     def pending_tasks(self):
         return [name for name, task in self._tasks.items() if not task.done()]
 
+    async def setup(self, *args, **kwargs):
+        await self.on_setup.send(self)
+        await self._setup(*args, **kwargs)
+        self._is_ready.set()
+        return self
+
+    async def shutdown(self, *args, **kwargs):
+        self._cancelled.set()
+        await self._shutdown(*args, **kwargs)
+        await self.on_shutdown.send(self)
+        await self.cancel()
+        self._done.set()
+
     def create_task(self,
                     coro: typing.Callable,
-                    *coro_args: tuple or list):
-        _task = self._loop.create_task(coro(*coro_args))
+                    *coro_args: tuple or list,
+                    **coro_kwargs: dict):
+        if self.cancelled:
+            raise TaskCreationError(
+                f"""
+                {self.__class__.__name__} was cancelled 
+                and will no longer create new tasks!
+                """
+            )
+        _task = self._loop.create_task(coro(*coro_args, **coro_kwargs))
         self._tasks[coro.__name__] = _task
         return _task
 
@@ -87,47 +139,27 @@ class AsyncBase:
         finally:
             self._waiting.clear()
 
-
-class AsyncCtx(AsyncBase):
-    def __init__(self, *,
-                 on_open=None,
-                 on_close=None,
-                 oo_extra_payload=None,
-                 oc_extra_payload=None,
-                 **kwargs):
-        super().__init__(**kwargs)
-        self.on_open = ODBSignal(self, oo_extra_payload)
-        self.on_close = ODBSignal(self, oc_extra_payload)
-        if on_open is not None:
-            if isinstance(on_open, (tuple, list)):
-                for sub in on_open:
-                    self.on_open(sub)
-            else: self.on_open(on_open)
-        if on_close is not None:
-            if isinstance(on_close, (tuple, list)):
-                for sub in on_close:
-                    self.on_close(sub)
-            else: self.on_close(on_close)
-
-    async def _close(self, *args, **kwargs):
-        try:
-            await self.cancel()
-            await self.close(*args, **kwargs)
-            await self.on_close.send(self)
-        finally:
-            self._done.set()
-
-    async def __aenter__(self):
-        await self.on_open.send(self)
+    async def _setup(self, *args, **kwargs):
+        """
+        Overwrite this if you want _is_ready to be set and
+        on_open signal to be send.
+        """
         return self
 
-    async def __aexit__(self, *exc_args):
-        await self._close()
-        return
-
-    async def close(self, *args, **kwargs):
+    async def _shutdown(self, *args, **kwargs):
         """
         Overwrite this if you want pending tasks to be cancelled and
         on_close signal to be send.
         """
-        return
+        return self
+
+class AsyncCtx(AsyncBase):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    async def __aenter__(self, *args, **kwargs):
+        await self.setup(*args, **kwargs)
+        return self
+
+    async def __aexit__(self, *exc_args):
+        await self.shutdown()

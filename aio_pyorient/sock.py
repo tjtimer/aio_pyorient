@@ -13,7 +13,6 @@ class ODBSocket(AsyncCtx):
         super().__init__(**kwargs)
         self._host = host
         self._port = port
-        self._connected = asyncio.Event(loop=self._loop)
         self._sent = asyncio.Event(loop=self._loop)
         self._reader, self._writer = None, None
         self._in_transaction = False
@@ -32,28 +31,35 @@ class ODBSocket(AsyncCtx):
 
     @property
     def connected(self):
-        return self._connected.is_set()
+        return self._is_ready.is_set()
 
     @property
     def in_transaction(self):
         return self._in_transaction
 
     async def connect(self):
-        self._reader, self._writer = await asyncio.open_connection(
-            self._host, self._port, loop=self._loop
-        )
-        protocol = short_packer.unpack(await self._reader.readexactly(2))[0]
-        self._connected.set()
-        return protocol
+        try:
+            self._reader, self._writer = await asyncio.open_connection(
+                self._host, self._port, loop=self._loop
+            )
+            self._sent.set()
+            protocol = short_packer.unpack(await self._reader.readexactly(2))[0]
+            self._is_ready.set()
+            return protocol
+        except asyncio.CancelledError:
+            self._done.set()
+            raise
 
-    async def _close(self):
-        self._connected.clear()
+    async def shutdown(self):
+        self._cancelled.set()
+        self._is_ready.clear()
         self._writer.close()
+        self._reader.set_exception(asyncio.CancelledError())
         self._host = ""
         self._port = 0
 
     async def send(self, buff):
-        await self._connected.wait()
+        await self._is_ready.wait()
         self._sent.clear()
         self._writer.write(buff)
         await self._writer.drain()

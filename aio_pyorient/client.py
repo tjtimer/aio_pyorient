@@ -1,6 +1,6 @@
 import asyncio
 
-from aio_pyorient.handler import db, server
+from aio_pyorient.handler import db, server, command
 from aio_pyorient.odb_types import ODBClusters
 from aio_pyorient.sock import ODBSocket
 from aio_pyorient.utils import AsyncCtx
@@ -33,7 +33,7 @@ class ODBClient(AsyncCtx):
         self._server_version = kwargs.pop("server_version", '')
         self._protocol = None
         self._serialization_type = "ORecordDocument2csv"
-        self._is_ready = asyncio.Event(loop=self._loop)
+        self._is_ready.set()
 
     @property
     def is_ready(self):
@@ -67,22 +67,41 @@ class ODBClient(AsyncCtx):
     def server_version(self):
         return self._server_version
 
-    async def close(self):
-        await self._sock.close()
+    async def _shutdown(self):
+        await self._sock.shutdown()
 
     async def connect(self, user: str, password: str, **kwargs):
-        request = await server.ServerConnect(self, user, password, **kwargs).send()
-        return await request.read()
+        handler = await server.ServerConnect(self, user, password, **kwargs).send()
+        return await handler.read()
+
+    async def create_db(self, db_name: str, storage_type: str, **kwargs):
+        handler = await db.CreateDb(self, db_name, storage_type, **kwargs).send()
+        return await handler.read()
 
     async def open_db(self, db_name: str, user: str, password: str, **kwargs):
-        request = await db.OpenDb(self, db_name, user, password, **kwargs).send()
-        await request.read()
-        return self
+        handler = await db.OpenDb(self, db_name, user, password, **kwargs).send()
+        return await handler.read()
 
     async def reload_db(self, **kwargs):
-        request = await db.ReloadDb(self, **kwargs).send()
-        return await request.read()
+        handler = await db.ReloadDb(self, **kwargs).send()
+        return await handler.read()
 
     async def close_db(self, **kwargs):
-        request = await db.CloseDb(self, **kwargs).send()
-        return await request.read()
+        handler = await db.CloseDb(self, **kwargs).send()
+        return await handler.read()
+
+    async def db_exist(self, db_name: str, storage_type: str, **kwargs):
+        handler = await db.DbExist(self, db_name, storage_type, **kwargs).send()
+        return await handler.read()
+
+    async def db_size(self, **kwargs):
+        handler = await db.DbSize(self, **kwargs).send()
+        return await handler.read()
+
+    async def db_record_count(self, **kwargs):
+        handler = await db.DbRecordCount(self, **kwargs).send()
+        return await handler.read()
+
+    async def execute(self, query: str, **kwargs):
+        handler = await command.Query(self, query, **kwargs).send()
+        return await handler.read()

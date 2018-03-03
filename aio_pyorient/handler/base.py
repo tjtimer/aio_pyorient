@@ -108,7 +108,8 @@ class BaseHandler(AsyncBase):
                  no_ows=False,
                  no_ods=False,
                  no_owr=False,
-                 no_odr=False):
+                 no_odr=False,
+                 **kwargs):
         super().__init__(loop=client._loop)
         self._sent = asyncio.Event(loop=self._loop)
         self._client = client

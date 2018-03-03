@@ -16,12 +16,12 @@ QUERY_SCRIPT  = "com.orientechnologies.orient.core.command.script.OCommandScript
 
 
 
-class QueryCommand(BaseHandler):
+class Query(BaseHandler):
     _callback = None
     results = None
     def __init__(self,
                  client,
-                 query: str,
+                 query: str, *,
                  command_type: str=QUERY_CMD,
                  limit: int=25,
                  fetch_plan: str='*:0',
@@ -35,7 +35,7 @@ class QueryCommand(BaseHandler):
             if not inspect.iscoroutinefunction(callback):
                 raise ValueError(
                     """
-                    QueryCommand needs a coroutine function as callback 
+                    Query needs a coroutine function as callback 
                     when mode set to 'a'!
                     """
                 )
@@ -101,7 +101,7 @@ class QueryCommand(BaseHandler):
             await self.read_char()
             if result_type == 'w':
                 records = (
-                    records[0].data.decode().replace('result', ''),
+                    records[0].data.decode().replace('result:', ''),
                 )
         elif result_type == 'l':
             _len = await self.read_int()
