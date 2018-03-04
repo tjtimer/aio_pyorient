@@ -8,7 +8,7 @@ from aio_pyorient.handler.command import Query
 async def test_db_command(db_client):
     handler = Query(
         db_client,
-        """select expand(classes) from metadata:schema"""
+        """select name from #22:0"""
     )
     await handler.send()
     response = await handler.read()

@@ -3,9 +3,10 @@ import inspect
 from typing import Callable
 
 from aio_pyorient.handler.base import (
-    BaseHandler, RequestHeader
+    BaseHandler
 )
-from aio_pyorient.odb_types import Bytes, Char, String, Integer, ODBRecord
+from aio_pyorient.odb_types import ODBRecord
+from aio_pyorient.handler.encoder import Bytes, Char, String, Integer, RequestHeader
 
 
 QUERY_SYNC    = "com.orientechnologies.orient.core.sql.query.OSQLSynchQuery"
@@ -44,11 +45,11 @@ class Query(BaseHandler):
         if "LIMIT" in query.upper():
             limit = -1
         payload = b''.join([
-            String.encode(command_type),
-            String.encode(query),
-            Integer.encode(limit),
-            String.encode(fetch_plan),
-            Integer.encode(0)
+            String(command_type),
+            String(query),
+            Integer(limit),
+            String(fetch_plan),
+            Integer(0)
         ])
         super().__init__(
             client,

@@ -5,7 +5,7 @@
 from pprint import pprint
 
 from aio_pyorient.handler.command import Query
-from aio_pyorient.odb_types import Schema
+from aio_pyorient.odb_types import ODBSchema
 from aio_pyorient.pool import ODBPool
 from aio_pyorient.utils import AsyncCtx
 
@@ -28,4 +28,4 @@ class ODBGraph(AsyncCtx):
 
     async def get_schema(self):
         handler = await Query(await self._pool.acquire(), SCHEMA_QUERY).send()
-        return Schema(await handler.read())
+        return ODBSchema(await handler.read())

@@ -12,4 +12,5 @@ async def test_graph(loop):
     async with ODBGraph(TEST_USER, TEST_PASSWORD, TEST_DB, loop=loop) as graph:
         schema = await graph.get_schema()
         print(schema)
+        pprint(schema.classes)
         assert schema is not None

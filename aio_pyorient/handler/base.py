@@ -1,8 +1,7 @@
 import asyncio
+import struct
 
 from aio_pyorient.odb_types import (
-    Byte, Bytes, Char, String, Integer, Short, Long, ODBRecord, int_packer, long_packer,
-    short_packer,
     ODBRequestErrorMessage
 )
 from aio_pyorient.utils import AsyncBase, ODBSignal
@@ -20,52 +19,6 @@ REQUEST_PUSH = 3
 
 class ODBHandlerError(BaseException):
     pass
-
-class RecordId:
-    @staticmethod
-    def encode(value):
-        c_id, pos = value.replace("#", "").split(":")
-        return Short.encode(int(c_id)) + Long.encode(pos)
-
-    @staticmethod
-    async def decode(sock):
-        c_id, pos = [await Short.decode(sock), await Long.decode(sock)]
-        return f"#{c_id}:{pos}"
-
-class Record:
-    @staticmethod
-    def encode(value):
-        fields = [
-            Byte.encode(value.type.encode("utf-8")),
-            RecordId.encode(value.id),
-            Integer.encode(value.version),
-            Bytes.encode(value.content)
-        ]
-        return b''.join(field for field in fields)
-
-    @staticmethod
-    async def decode(sock):
-        r_type = await Char.decode(sock)
-        r_id = await RecordId.decode(sock)
-        r_version = await Integer.decode(sock)
-        r_content = await Bytes.decode(sock)
-        return ODBRecord(r_type, r_id, r_version, r_content)
-
-class Link(RecordId):
-    pass
-
-class Introduction:
-    @staticmethod
-    def encode(_):
-        return String.encode(NAME) + String.encode(VERSION) + Short.encode(SUPPORTED_PROTOCOL)
-
-class RequestHeader:
-    @staticmethod
-    def encode(args):
-        header = Byte.encode(chr(args[0])) + Integer.encode(args[1])
-        if len(args) is 2:
-            return header
-        return header + Bytes.encode(args[2])
 
 
 class BaseHandler(AsyncBase):
@@ -115,7 +68,7 @@ class BaseHandler(AsyncBase):
         self._client = client
         self._sock = client._sock
         self._request = b''.join(
-            field_type.encode(value)
+            field_type(value)
             for field_type, value in fields
         )
         self.on_will_send = ODBSignal(self, ows_extra_payload)
@@ -222,3 +175,8 @@ class BaseHandler(AsyncBase):
         and on_did_read signals to be send.
         """
         pass
+
+
+int_packer = struct.Struct("!i")
+short_packer = struct.Struct("!h")
+long_packer = struct.Struct("!q")

@@ -1,7 +1,7 @@
 import asyncio
 import struct
 
-from aio_pyorient.odb_types import short_packer
+from aio_pyorient.handler.base import short_packer
 from aio_pyorient.utils import AsyncCtx
 
 

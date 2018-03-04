@@ -1,5 +1,5 @@
-from aio_pyorient.handler.base import BaseHandler, Introduction, RequestHeader
-from aio_pyorient.odb_types import Boolean, String
+from aio_pyorient.handler.base import BaseHandler
+from aio_pyorient.handler.encoder import Boolean, String, Introduction, RequestHeader
 
 
 class ServerConnect(BaseHandler):
