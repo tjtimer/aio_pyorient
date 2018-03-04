@@ -17,7 +17,7 @@ class ODBSocket(AsyncCtx):
         self._reader, self._writer = None, None
         self._in_transaction = False
         self._props = None
-        self.create_task(
+        self.spawn(
             self.connect
         )
 

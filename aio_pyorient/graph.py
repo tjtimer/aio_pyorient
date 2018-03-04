@@ -2,9 +2,14 @@
 
  graph
 """
+from pprint import pprint
+
+from aio_pyorient.handler.command import Query
+from aio_pyorient.odb_types import Schema
 from aio_pyorient.pool import ODBPool
 from aio_pyorient.utils import AsyncCtx
 
+SCHEMA_QUERY = "select expand(classes) from metadata:schema"
 
 class ODBGraph(AsyncCtx):
     def __init__(self, user: str, password: str, db_name: str, **kwargs):
@@ -20,3 +25,7 @@ class ODBGraph(AsyncCtx):
 
     async def _shutdown(self):
         await self._pool.shutdown()
+
+    async def get_schema(self):
+        handler = await Query(await self._pool.acquire(), SCHEMA_QUERY).send()
+        return Schema(await handler.read())

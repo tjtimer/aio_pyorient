@@ -4,13 +4,11 @@
 """
 
 from aio_pyorient.handler.command import Query
-from aio_pyorient.model.base import InitCommands
-
 
 async def test_db_command(db_client):
     handler = Query(
         db_client,
-        """select from person"""
+        """select expand(classes) from metadata:schema"""
     )
     await handler.send()
     response = await handler.read()

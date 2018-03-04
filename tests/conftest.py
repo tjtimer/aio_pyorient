@@ -25,3 +25,4 @@ async def db_client(loop):
     async with ODBClient("localhost", 2424, loop=loop) as client:
         await client.open_db(TEST_DB, TEST_USER, TEST_DB_PASSWORD)
         yield client
+

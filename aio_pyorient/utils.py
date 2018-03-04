@@ -1,4 +1,6 @@
 import asyncio
+import concurrent.futures
+import functools
 import inspect
 import typing
 from collections import namedtuple
@@ -70,6 +72,7 @@ class AsyncBase:
     @property
     def tasks(self):
         return self._tasks.keys()
+
     @property
     def is_ready(self):
         return self._is_ready.is_set()
@@ -103,10 +106,11 @@ class AsyncBase:
         await self.cancel()
         self._done.set()
 
-    def create_task(self,
-                    coro: typing.Callable,
-                    *coro_args: tuple or list,
-                    **coro_kwargs: dict):
+    def spawn(self,
+              func: typing.Callable,
+              *func_args: tuple or list,
+              executor: concurrent.futures.Executor=None,
+              **func_kwargs: dict):
         if self.cancelled:
             raise TaskCreationError(
                 f"""
@@ -114,8 +118,15 @@ class AsyncBase:
                 and will no longer create new tasks!
                 """
             )
-        _task = self._loop.create_task(coro(*coro_args, **coro_kwargs))
-        self._tasks[coro.__name__] = _task
+        if not isinstance(func, typing.Callable):
+            raise ValueError(f"First argument must be a callable!")
+        if inspect.iscoroutinefunction(func):
+            _task = self._loop.create_task(func(*func_args, **func_kwargs))
+        else:
+            _task = self._loop.run_in_executor(
+                executor, functools.partial(func, *func_args, **func_kwargs)
+            )
+        self._tasks[func.__name__] = _task
         return _task
 
     async def cancel(self):

@@ -50,12 +50,12 @@ class ODBPool(AsyncCtx):
             client = self._available_clients.popleft()
             client._is_ready.clear()
             self._busy_clients.append(client)
-            self.create_task(self._watch_client, client)
+            self.spawn(self._watch_client, client)
             return client
         finally:
             if self.available_clients is 0:
                 self._is_ready.clear()
-                self.create_task(self._add_client)
+                self.spawn(self._add_client)
 
     async def _add_client(self):
         if self.cancelled or self.clients >= self._max:
