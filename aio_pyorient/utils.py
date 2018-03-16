@@ -10,6 +10,9 @@ import arrow as arrow
 
 ODBSignalPayload = namedtuple('ODBSignalPayload', 'sender, extra')
 
+def is_coro(coro):
+    return asyncio.iscoroutinefunction(coro)
+
 class ODBSignal:
 
     def __init__(self, sender, extra=None):
@@ -21,10 +24,9 @@ class ODBSignal:
     def payload(self):
         return ODBSignalPayload(self._sender, self._extra)
 
-    def __call__(self, coro):
-        assert inspect.iscoroutinefunction(coro), \
-            "First argument must be awaitable, e.g. coroutine or future."
-        self._receiver.append(coro)
+    def __call__(self, coros):
+        assert all([is_coro(c) for c in coros])
+        self._receiver += coros
 
     async def send(self, sender=None, extra=None):
         sender = sender if sender else self._sender
@@ -39,14 +41,15 @@ class TaskCreationError(BaseException):
 
 
 class AsyncBase:
-
+    WHEN_ALL = asyncio.ALL_COMPLETED
+    WHEN_FIRST = asyncio.FIRST_COMPLETED
     def __init__(self, *,
                  on_setup=None,
                  on_shutdown=None,
                  on_setup_extra_payload=None,
                  on_shutdown_extra_payload=None,
                  **kwargs):
-        self._loop = kwargs.get("loop", asyncio.get_event_loop())
+        self._loop = asyncio.get_event_loop()
         self._tasks = {}
         self._is_ready = asyncio.Event(loop=self._loop)
         self._cancelled = asyncio.Event(loop=self._loop)
@@ -55,15 +58,9 @@ class AsyncBase:
         self.on_setup = ODBSignal(self, on_setup_extra_payload)
         self.on_shutdown = ODBSignal(self, on_shutdown_extra_payload)
         if on_setup is not None:
-            if isinstance(on_setup, (tuple, list)):
-                for sub in on_setup:
-                    self.on_setup(sub)
-            else: self.on_setup(on_setup)
+            self.on_setup += on_setup
         if on_shutdown is not None:
-            if isinstance(on_shutdown, (tuple, list)):
-                for sub in on_shutdown:
-                    self.on_shutdown(sub)
-            else: self.on_shutdown(on_shutdown)
+            self.on_shutdown += on_shutdown
 
     @property
     def name(self):
@@ -93,63 +90,6 @@ class AsyncBase:
     def pending_tasks(self):
         return [name for name, task in self._tasks.items() if not task.done()]
 
-    async def setup(self, *args, **kwargs):
-        await self.on_setup.send(self)
-        await self._setup(*args, **kwargs)
-        self._is_ready.set()
-        return self
-
-    async def shutdown(self, *args, **kwargs):
-        self._cancelled.set()
-        await self._shutdown(*args, **kwargs)
-        await self.on_shutdown.send(self)
-        await self.cancel()
-        self._done.set()
-
-    def spawn(self,
-              func: typing.Callable,
-              *func_args: tuple or list,
-              executor: concurrent.futures.Executor=None,
-              **func_kwargs: dict):
-        if self.cancelled:
-            raise TaskCreationError(
-                f"""
-                {self.__class__.__name__} was cancelled 
-                and will no longer create new tasks!
-                """
-            )
-        if not isinstance(func, typing.Callable):
-            raise ValueError(f"First argument must be a callable!")
-        if inspect.iscoroutinefunction(func):
-            _task = self._loop.create_task(func(*func_args, **func_kwargs))
-        else:
-            _task = self._loop.run_in_executor(
-                executor, functools.partial(func, *func_args, **func_kwargs)
-            )
-        self._tasks[func.__name__] = _task
-        return _task
-
-    async def cancel(self):
-        self._cancelled.set()
-        for task in self._tasks.values():
-            if not task.done():
-                task.cancel()
-        self._done.set()
-
-    async def cancel_task(self, name: str = ''):
-        task = self._tasks[name]
-        if not task.done():
-            return task.cancel()
-        return task.done()
-
-    async def wait_for(self, fut, timeout=None):
-        self._waiting.set()
-        try:
-            result = await asyncio.wait_for(fut, timeout, loop=self._loop)
-            return result
-        finally:
-            self._waiting.clear()
-
     async def _setup(self, *args, **kwargs):
         """
         Overwrite this if you want _is_ready to be set and
@@ -163,6 +103,57 @@ class AsyncBase:
         on_close signal to be send.
         """
         return self
+
+    async def setup(self, *args, **kwargs):
+        await self.on_setup.send(self)
+        await self._setup(*args, **kwargs)
+        self._is_ready.set()
+        return self
+
+    async def shutdown(self, *args, **kwargs):
+        self._is_ready.clear()
+        await self.cancel()
+        await self._shutdown(*args, **kwargs)
+        await self.on_shutdown.send(self)
+        self._done.set()
+
+    async def cancel(self):
+        self._cancelled.set()
+        for n,t in self._tasks.items():
+            for _task in t:
+                _task.cancel()
+            await self.wait_for(*t, timeout=0)
+
+    async def wait_for(self, *futs, rw=asyncio.ALL_COMPLETED, timeout=None):
+        self._waiting.set()
+        try:
+            if len(futs) is 1:
+                return await asyncio.wait_for(futs, timeout)
+            else:
+                return await asyncio.wait(futs, timeout=timeout, return_when=rw)
+        finally:
+            self._waiting.clear()
+
+    def fork(self,
+              func: typing.Callable,
+              *func_args: tuple or list,
+              executor: concurrent.futures.Executor=None,
+              **func_kwargs: dict):
+        if self.cancelled:
+            return
+        _coro = self._loop.run_in_executor(
+            executor, functools.partial(func, *func_args, **func_kwargs)
+        )
+        return self.spawn(_coro)
+
+    def spawn(self, func: typing.Coroutine):
+        if self.cancelled:
+            return
+        _task = asyncio.ensure_future(func)
+        if not func.__name__ in self._tasks.keys():
+            self._tasks[func.__name__] = []
+        self._tasks[func.__name__].append(_task)
+        return _task
 
 class AsyncCtx(AsyncBase):
     def __init__(self, **kwargs):

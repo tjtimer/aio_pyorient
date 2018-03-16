@@ -13,6 +13,7 @@ setup(
         'aio_pyorient',
     ],
     install_requires=[
+        'arrow',
         'pytest',
         'pytest-aiohttp'
     ]

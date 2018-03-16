@@ -2,34 +2,24 @@
 
  test_pool
 """
-import asyncio
-from pprint import pprint
+from random import randint
 
 from aio_pyorient.pool import ODBPool
-from tests.test_settings import TEST_PASSWORD, TEST_USER, TEST_DB
+from tests.test_settings import TEST_DB, TEST_PASSWORD, TEST_USER
 
 
 async def test_pool(loop):
+    cl_count = randint(1, 125)
+    print(f'test will acquire {cl_count} clients')
     async with ODBPool(TEST_USER, TEST_PASSWORD, db_name=TEST_DB, loop=loop) as pool:
         assert pool.min is 5
         assert pool.max == 30000
-        assert not pool.is_full
         assert pool.available_clients is pool.min
         assert pool.is_ready
-        client_1 = await pool.acquire()
-        client_2 = await pool.acquire()
-        client_3 = await pool.acquire()
-        assert client_1.session_id >= 0
-        assert client_1._auth_token not in (b'', '', None)
-        assert client_1._sock.connected is True
-        assert client_2.session_id >= 0
-        assert client_2._auth_token not in (b'', '', None)
-        assert client_2._sock.connected is True
-        assert client_3.session_id >= 0
-        assert client_3._auth_token not in (b'', '', None)
-        assert client_3._sock.connected is True
-        assert client_1.session_id != client_2.session_id
-        assert client_1.session_id != client_3.session_id
-        assert client_2.session_id != client_3.session_id
+        all_clients = [await pool.acquire() for _ in range(cl_count)]
+        assert all([cl.session_id >= 0 for cl in all_clients])
+        assert all([cl._auth_token not in (b'', '', None) for cl in all_clients])
+        assert all([cl._sock.connected is True for cl in all_clients])
+        assert len(set(all_clients)) == cl_count
     assert pool.done
     assert pool.available_clients is 0

@@ -15,9 +15,8 @@ class ODBPool(AsyncCtx):
         if max <= min:
             max = 30000
         self._max = max
-        self._available_clients = deque()
-        self._busy_clients = deque()
-        self._is_full = asyncio.Event(loop=self._loop)
+        self._clients = asyncio.Queue()
+        self._client_count = 0
         self._kwargs = kwargs
 
     @property
@@ -29,33 +28,26 @@ class ODBPool(AsyncCtx):
         return self._max
 
     @property
-    def is_full(self):
-        return self._is_full.is_set()
-
-    @property
     def available_clients(self):
-        return len(self._available_clients)
-
-    @property
-    def busy_clients(self):
-        return len(self._busy_clients)
+        if self._clients is None:
+            return 0
+        return self._clients.qsize()
 
     @property
     def clients(self):
-        return len(self._available_clients) + len(self._busy_clients)
+        return self._client_count
 
     async def acquire(self):
         try:
             await self._is_ready.wait()
-            client = self._available_clients.popleft()
+            client = await self._clients.get()
             client._is_ready.clear()
-            self._busy_clients.append(client)
-            self.spawn(self._watch_client, client)
+            self.spawn(self._watch_client(client))
             return client
         finally:
             if self.available_clients is 0:
                 self._is_ready.clear()
-                self.spawn(self._add_client)
+                self.spawn(self._add_client())
 
     async def _add_client(self):
         if self.cancelled or self.clients >= self._max:
@@ -70,36 +62,28 @@ class ODBPool(AsyncCtx):
                 self._db_name, self.__user, self.__password, **self._kwargs
             )
         await client._is_ready.wait()
-        self._available_clients.append(client)
+        self._clients.put_nowait(client)
+        self._client_count += 1
         self._is_ready.set()
         return self
 
     async def _watch_client(self, client):
         try:
             await client._is_ready.wait()
-            self._busy_clients.remove(client)
-            if not self.cancelled:
-                self._available_clients.append(client)
+            if not self.cancelled and self._client_count<=self._max:
+                self._clients.put_nowait(client)
                 self._is_ready.set()
-            return self._done.set()
-        except asyncio.CancelledError:
-            print("pool._watch_client got cancelled")
-            raise asyncio.CancelledError()
-
+            else:
+                await client.shutdown()
+                self._client_count -= 1
+        except Exception as e:
+            pass
 
     async def setup(self):
-        await asyncio.gather(
+        await self.wait_for(
             *(self._add_client() for _ in range(self._min))
         )
         return self
 
     async def _shutdown(self, *args, **kwargs):
-        while True:
-            if len(self._available_clients) <= 0:
-                if len(self._busy_clients) <= 0:
-                    break
-                client = self._busy_clients.pop()
-                await client.shutdown()
-            else:
-                client = self._available_clients.pop()
-                await client.shutdown()
+        self._clients = None

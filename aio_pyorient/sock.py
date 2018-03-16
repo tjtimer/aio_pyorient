@@ -18,7 +18,7 @@ class ODBSocket(AsyncCtx):
         self._in_transaction = False
         self._props = None
         self.spawn(
-            self.connect
+            self.connect()
         )
 
     @property
@@ -38,17 +38,13 @@ class ODBSocket(AsyncCtx):
         return self._in_transaction
 
     async def connect(self):
-        try:
-            self._reader, self._writer = await asyncio.open_connection(
-                self._host, self._port, loop=self._loop
-            )
-            self._sent.set()
-            protocol = short_packer.unpack(await self._reader.readexactly(2))[0]
-            self._is_ready.set()
-            return protocol
-        except asyncio.CancelledError:
-            self._done.set()
-            raise
+        self._reader, self._writer = await asyncio.open_connection(
+            self._host, self._port, loop=self._loop
+        )
+        self._sent.set()
+        protocol = short_packer.unpack(await self._reader.readexactly(2))[0]
+        self._is_ready.set()
+        return protocol
 
     async def shutdown(self):
         self._cancelled.set()
