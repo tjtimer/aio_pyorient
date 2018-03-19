@@ -5,12 +5,13 @@
 from pprint import pprint
 
 from aio_pyorient.graph import ODBGraph
+from aio_pyorient.odb_types import ODBSchema
 from tests.test_settings import TEST_USER, TEST_PASSWORD, TEST_DB
 
 
 async def test_graph(loop):
     async with ODBGraph(TEST_USER, TEST_PASSWORD, TEST_DB, loop=loop) as graph:
-        schema = await graph.get_schema()
-        print(schema)
-        pprint(schema.classes)
-        assert schema is not None
+        pprint(vars(graph.schema))
+        assert isinstance(graph.schema, ODBSchema)
+        assert 'V' in graph.schema.classes.keys()
+        assert 'E' in graph.schema.classes.keys()

@@ -1,6 +1,5 @@
 """
-
- prop_types
+prop_types
 """
 from typing import Any
 

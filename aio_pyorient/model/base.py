@@ -2,38 +2,46 @@
 
  base
 """
-from aio_pyorient.model.prop_types import String, Integer
+from aio_pyorient.model.prop_types import String, Integer, PropType
 from aio_pyorient.utils import AsyncCtx
 
 
 InitCommands = []
+vertex_registry = []
+edge_registry = []
 
-class Vertex:
-    def __init_subclass__(cls):
-        InitCommands.append(f"CREATE CLASS {cls.__name__} EXTENDS V")
-        props = {k: v for k,v in cls.__dict__.items() if not k.startswith('_')}
-        for name, prop_type in props.items():
+
+class CommandBuilder:
+
+    @staticmethod
+    async def props_cmd(cls, alter_or_create: str='alter'):
+
+        def props(cls):
+            return ((k, v) for k, v in cls.__dict__.items() if isinstance(k, PropType))
+
+        def add_attr_definition(**attributes):
+            attr_command = ', '.join([
+                f"{attr_name} {attr_value}"
+                for attr_name, attr_value in attributes
+            ])
+            return f' ({attr_command})'
+
+        for name, prop_type in props(cls):
             prop_command = f"""
-            CREATE PROPERTY {cls.__name__}.{name} {prop_type.__class__.__name__}
+            {alter_or_create.upper()} PROPERTY
+            {cls.__name__}.{name} {prop_type.__class__.__name__}
             """.strip().replace('\n', '')
-            if len(prop_type.__dict__):
-                prop_command += "("
-                for prop_attr, attr_value in prop_type.__dict__.items():
-                    prop_command += f" {prop_attr} {attr_value},"
-                prop_command = prop_command[0:-1]
-                prop_command += ")"
-            InitCommands.append(prop_command)
+            prop_command += add_attr_definition(**prop_type.__dict__)
+            yield prop_command
 
-class Edge:
+class ODBVertex(CommandBuilder):
     def __init_subclass__(cls):
-        InitCommands.append(f"CREATE CLASS {cls.__name__} EXTENDS E")
+        vertex_registry.append(cls)
+
+class ODBEdge(CommandBuilder):
+    def __init_subclass__(cls):
+        edge_registry.append(f"CREATE CLASS {cls.__name__} EXTENDS E")
         InitCommands.append(
             f"CREATE PROPERTY {cls.__name__}.label (MANDATORY True)"
         )
         cls.label = cls.__name__.lower()
-
-class Graph(AsyncCtx):
-    def __init__(self, db_name: str, user: str, password: str, **kwargs):
-        self._db_name = db_name
-        self._user = user
-        self._password = password
