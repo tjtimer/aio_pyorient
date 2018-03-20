@@ -1,4 +1,4 @@
-from aio_pyorient.odb_types import ODBCluster
+from aio_pyorient.odb_types import ODBCluster, ODBClusters
 
 from aio_pyorient.handler.base import (
     BaseHandler
@@ -10,9 +10,11 @@ class DbBaseHandler(BaseHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    async def read_clusters(self):
+    async def read_clusters(self, client):
+        client._clusters = ODBClusters()
         for _ in range(await self.read_short()):
-            yield ODBCluster(await self.read_string(), await self.read_short())
+            client._clusters.append(
+                ODBCluster(await self.read_string(), await self.read_short()))
 
 class OpenDb(DbBaseHandler):
 
@@ -44,8 +46,7 @@ class OpenDb(DbBaseHandler):
         await self.read_header(with_token=False)  # returns status, old session_id, empty byte
         self._client._session_id = await self.read_int()
         self._client._auth_token = await self.read_bytes()
-        async for cluster in self.read_clusters():
-            self._client._clusters.append(cluster)
+        await self.read_clusters(self._client)
         self._client._cluster_conf = await self.read_bytes()
         self._client._server_version = await self.read_string()
         self._client._db_name = self._db_name
@@ -61,11 +62,9 @@ class ReloadDb(DbBaseHandler):
         )
 
     async def _read(self):
-        self._client._clusters.clear()
         self._client._session_id = await self.read_int()
         self._client._auth_token = await self.read_bytes()
-        async for cluster in self.read_clusters():
-            self._client._clusters.append(cluster)
+        await self.read_clusters(self._client)
         return self._client
 
 class CreateDb(BaseHandler):

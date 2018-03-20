@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-from aio_pyorient.serializer import serialize, Boolean, Integer, List, String, Float, Type
+from aio_pyorient.serializer import serialize, Boolean, Integer, List, String, Float, Type, IntegerList, StringList
 
 
 ODBRecord = namedtuple("ODBRecord", "type, id, version, data")
@@ -25,7 +25,7 @@ class ODBClusters(list):
 
 SCHEMA_SPECS = {
     'abstract': Boolean,
-    'clusterIds': List,
+    'clusterIds': IntegerList,
     'clusterSelection': String,
     'customFields': String,
     'defaultClusterId': Integer,
@@ -36,10 +36,7 @@ SCHEMA_SPECS = {
     'shortName': String,
     'strictMode': Boolean,
     'superClass': String,
-    'superClasses': List,
-    'type': Type,
-    'notNull': Boolean,
-    'mandatory': Boolean
+    'superClasses': StringList,
 }
 PROPS_SPECS = {
     'collate': String,

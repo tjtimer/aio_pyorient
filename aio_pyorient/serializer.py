@@ -23,7 +23,9 @@ String = lambda v: v[1:-1] if len(v) > 1 else v
 Integer = lambda v: int(v.replace('"', '')) if len(v) > 0 else None
 Float = lambda v: float(v[:-1])
 Boolean = lambda v: True if v.upper() == 'TRUE' else False
-List = lambda v: v[1:-1].split(', ') if len(v) > 1 else []
+List = lambda v: v[1:-1].split(',') if len(v) > 1 else []
+IntegerList = lambda v: [int(val) for val in List(v)]
+StringList = lambda v: [val.replace('"', '') for val in List(v)]
 Type = lambda v: TYPE_MAP[v]
 
 key_reg = re.compile(r',?@?[a-zA-Z]+:')

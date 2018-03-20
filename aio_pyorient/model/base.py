@@ -34,9 +34,11 @@ class CommandBuilder:
             prop_command += add_attr_definition(**prop_type.__dict__)
             yield prop_command
 
+
 class ODBVertex(CommandBuilder):
     def __init_subclass__(cls):
         vertex_registry.append(cls)
+
 
 class ODBEdge(CommandBuilder):
     def __init_subclass__(cls):
