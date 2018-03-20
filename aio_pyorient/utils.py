@@ -24,7 +24,7 @@ class ODBSignal:
     def payload(self):
         return ODBSignalPayload(self._sender, self._extra)
 
-    def __call__(self, coros):
+    def __call__(self, *coros):
         assert all([is_coro(c) for c in coros])
         self._receiver += coros
 
@@ -49,8 +49,8 @@ class AsyncBase:
                  on_setup_extra_payload=None,
                  on_shutdown_extra_payload=None,
                  **kwargs):
-        self._loop = asyncio.get_event_loop()
         self._tasks = {}
+        self._loop = asyncio.get_event_loop()
         self._is_ready = asyncio.Event(loop=self._loop)
         self._cancelled = asyncio.Event(loop=self._loop)
         self._done = asyncio.Event(loop=self._loop)

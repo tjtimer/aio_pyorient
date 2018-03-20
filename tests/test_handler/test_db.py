@@ -48,7 +48,7 @@ async def test_db_open(client):
         assert cluster.id >= 0
         assert isinstance(cluster.name, str)
         assert cluster.name != ""
-    assert client.clusters.get('internal') == 0
-    assert client.clusters.get(0) == 'internal'
+    assert 0 in client.clusters.get('internal')
+    assert 'internal' in client.clusters.get(0)
     assert client.server_version not in (None, '')
     pprint(vars(client))
