@@ -1,16 +1,19 @@
 import asyncio
 import concurrent.futures
 import functools
+import inspect
 import typing
 from collections import namedtuple
 
+import arrow as arrow
 
-SignalPayload = namedtuple('SignalPayload', 'sender, extra')
+
+ODBSignalPayload = namedtuple('ODBSignalPayload', 'sender, extra')
 
 def is_coro(coro):
     return asyncio.iscoroutinefunction(coro)
 
-class Signal:
+class ODBSignal:
 
     def __init__(self, sender, extra=None):
         self._sender = sender
@@ -19,17 +22,17 @@ class Signal:
 
     @property
     def payload(self):
-        return SignalPayload(self._sender, self._extra)
+        return ODBSignalPayload(self._sender, self._extra)
 
-    def __call__(self, *coros):
+    def __call__(self, coros):
         assert all([is_coro(c) for c in coros])
         self._receiver += coros
 
     async def send(self, sender=None, extra=None):
-        sender = self._sender if sender is None else sender
+        sender = sender if sender else self._sender
         extra = self._extra if extra is None else extra
         return await asyncio.gather(
-            *(coro(SignalPayload(sender, extra)) for coro in self._receiver)
+            *(coro(ODBSignalPayload(sender, extra)) for coro in self._receiver)
         )
 
 
@@ -38,23 +41,22 @@ class TaskCreationError(BaseException):
 
 
 class AsyncBase:
-    ALL_COMPLETED = asyncio.ALL_COMPLETED
-    FIRST_COMPLETED = asyncio.FIRST_COMPLETED
-    FIRST_EXCEPTION = asyncio.FIRST_EXCEPTION
+    WHEN_ALL = asyncio.ALL_COMPLETED
+    WHEN_FIRST = asyncio.FIRST_COMPLETED
     def __init__(self, *,
                  on_setup=None,
                  on_shutdown=None,
                  on_setup_extra_payload=None,
                  on_shutdown_extra_payload=None,
                  **kwargs):
-        self._tasks = {}
         self._loop = asyncio.get_event_loop()
+        self._tasks = {}
         self._is_ready = asyncio.Event(loop=self._loop)
         self._cancelled = asyncio.Event(loop=self._loop)
         self._done = asyncio.Event(loop=self._loop)
         self._waiting = asyncio.Event(loop=self._loop)
-        self.on_setup = Signal(self, on_setup_extra_payload)
-        self.on_shutdown = Signal(self, on_shutdown_extra_payload)
+        self.on_setup = ODBSignal(self, on_setup_extra_payload)
+        self.on_shutdown = ODBSignal(self, on_shutdown_extra_payload)
         if on_setup is not None:
             self.on_setup += on_setup
         if on_shutdown is not None:
@@ -117,10 +119,10 @@ class AsyncBase:
 
     async def cancel(self):
         self._cancelled.set()
-        for t in self.pending_tasks:
-            self._tasks[t].cancel()
-        if len(self.pending_tasks) >= 1:
-            await self.wait_for(*self._tasks.values(), timeout=0)
+        for n,t in self._tasks.items():
+            for _task in t:
+                _task.cancel()
+            await self.wait_for(*t, timeout=0)
 
     async def wait_for(self, *futs, rw=asyncio.ALL_COMPLETED, timeout=None):
         self._waiting.set()
@@ -148,8 +150,9 @@ class AsyncBase:
         if self.cancelled:
             return
         _task = asyncio.ensure_future(func)
-        t_id = len(self._tasks)
-        self._tasks[f"{t_id}_{func.__name__}"] =_task
+        if not func.__name__ in self._tasks.keys():
+            self._tasks[func.__name__] = []
+        self._tasks[func.__name__].append(_task)
         return _task
 
 class AsyncCtx(AsyncBase):

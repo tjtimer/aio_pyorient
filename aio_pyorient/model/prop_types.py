@@ -27,18 +27,7 @@ class PropType:
                 f'{k} is not a valid attribute'
             assert isinstance(v, PROPERTY_ATTRIBUTES[attr]), \
                 f'{v} is not a valid value for attribute {k}'
-            self.__setattr__(attr, v)
-
-    @property
-    def settings(self):
-        return {k: v for k, v in self.__dict__.items()}
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        if len(self.settings) > 0:
-            attrs = ', '.join([f'{k} {v}' for k, v in self.settings.items()])
-            return f"{name} ({attrs})"
-        return name
+            self.__setattr__(k, v)
 
 class Any(PropType):
     pass

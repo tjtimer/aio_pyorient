@@ -1,7 +1,7 @@
 import asyncio
 
 from aio_pyorient.handler import db, server, command
-from aio_pyorient.odb_types import ODBClusters, ODBSchema
+from aio_pyorient.odb_types import ODBClusters
 from aio_pyorient.sock import ODBSocket
 from aio_pyorient.utils import AsyncCtx
 
@@ -13,38 +13,26 @@ except ImportError:
     pass
 
 
-SCHEMA_QUERY = "select expand(classes) from metadata:schema"
-
-
 class ODBClient(AsyncCtx):
     """
     ODBClient
     Use this to talk to your OrientDB server.
 
     """
-    _serialization_type = "ORecordDocument2csv"  #
-    # _serialization_type = "ORecordSerializerBinary"
     def __init__(self,
                  host: str = 'localhost',
-                 port: int = 2424,
-                 auth_token: bytes = b'',
-                 client_id: str = '',
-                 clusters: ODBClusters = ODBClusters(),
-                 cluster_conf: bytes = b'',
-                 db_name: str = '',
-                 server_version: str = '',
-                 session_id: int = -1, **kwargs):
+                 port: int = 2424, **kwargs):
         super().__init__(**kwargs)
         self._sock = ODBSocket(host=host, port=port, loop=self._loop)
-        self._auth_token = auth_token
-        self._id = client_id
-        self._clusters = clusters
-        self._cluster_conf = cluster_conf
-        self._db_name = db_name
-        self._server_version = server_version
-        self._session_id = session_id
+        self._id = kwargs.pop('client_id', '')
+        self._session_id = kwargs.pop("session_id", -1)
+        self._auth_token = kwargs.pop("auth_token", b'')
+        self._db_name = kwargs.pop("db_name", '')
+        self._clusters = kwargs.pop("clusters", ODBClusters())
+        self._cluster_conf = kwargs.pop("cluster_conf", b'')
+        self._server_version = kwargs.pop("server_version", '')
         self._protocol = None
-        self._watcher = {}
+        self._serialization_type = "ORecordDocument2csv"
         self._is_ready.set()
 
     @property
@@ -64,7 +52,7 @@ class ODBClient(AsyncCtx):
         return self._auth_token
 
     @property
-    def active_db(self):
+    def db_opened(self):
         return self._db_name
 
     @property
@@ -78,10 +66,6 @@ class ODBClient(AsyncCtx):
     @property
     def server_version(self):
         return self._server_version
-
-    @property
-    def watcher(self):
-        return self._watcher
 
     async def _shutdown(self):
         await self._sock.shutdown()
@@ -117,16 +101,6 @@ class ODBClient(AsyncCtx):
     async def db_record_count(self, **kwargs):
         handler = await db.DbRecordCount(self, **kwargs).send()
         return await handler.read()
-
-    async def get_schema(self):
-        handler = await command.Query(self, SCHEMA_QUERY).send()
-        result = await handler.read()
-        return ODBSchema(result)
-
-    async def watch_schema(self):
-        handler = await command.Query(self, "LIVE SELECT FROM '0:1").send()
-        result = await handler.read()
-        return ODBSchema(result)
 
     async def execute(self, query: str, **kwargs):
         handler = await command.Query(self, query, **kwargs).send()

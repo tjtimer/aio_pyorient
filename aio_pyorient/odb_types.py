@@ -1,11 +1,11 @@
 from collections import namedtuple
 
-from aio_pyorient.serializer import csv_serialize, Boolean, Integer, List, String, Float, Type, IntegerList, StringList
+from aio_pyorient.serializer import serialize, Boolean, Integer, List, String, Float, Type
 
 
 ODBRecord = namedtuple("ODBRecord", "type, id, version, data")
 ODBCluster = namedtuple('ODBCluster', 'name, id')
-
+ODBRequestErrorMessage = namedtuple("ODBException", "class_name, message")
 
 class ODBClusters(list):
 
@@ -13,19 +13,19 @@ class ODBClusters(list):
         is_id = isinstance(prop, int)
         attr_type = 'id' if is_id else 'name'
         try:
-            clusters = [cl for cl in self if prop in cl]
+            cluster = [cl for cl in self if prop in cl][0]
         except IndexError:
             raise ValueError(
                 f"cluster with {attr_type} {prop} does not exist"
             )
         else:
             if is_id:
-                return [cluster.name for cluster in clusters]
-            return [cluster.id for cluster in clusters]
+                return cluster.name
+            return cluster.id
 
 SCHEMA_SPECS = {
     'abstract': Boolean,
-    'clusterIds': IntegerList,
+    'clusterIds': List,
     'clusterSelection': String,
     'customFields': String,
     'defaultClusterId': Integer,
@@ -36,7 +36,10 @@ SCHEMA_SPECS = {
     'shortName': String,
     'strictMode': Boolean,
     'superClass': String,
-    'superClasses': StringList,
+    'superClasses': List,
+    'type': Type,
+    'notNull': Boolean,
+    'mandatory': Boolean
 }
 PROPS_SPECS = {
     'collate': String,
@@ -64,10 +67,10 @@ class ODBSchema:
                 props_end = d_string.find(')>')
                 p_string = d_string[props_start + 1:props_end]
                 props = [
-                    csv_serialize(_p, PROPS_SPECS) for _p in p_string.split('),(')
+                    serialize(_p, PROPS_SPECS) for _p in p_string.split('),(')
                 ]
                 d_string = d_string[0:props_start] + d_string[props_end+1:]
-            data = csv_serialize(d_string, SCHEMA_SPECS)
+            data = serialize(d_string, SCHEMA_SPECS)
             data['properties'] = {prop['name']: prop for prop in props}
             self._classes[data['name']] = data
 

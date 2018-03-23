@@ -36,7 +36,7 @@ async def test_create_command(db_client):
     print(name, age)
     handler = Query(
         db_client,
-        f"""CREATE VERTEX Person SET name="{name}", age={age}, email='{name}@mail.ex RETURN AFTER @this"""
+        f"create vertex Person SET name='{name}', age={age}, email='{name}@mail.ex'"
     )
     await handler.send()
     response = await handler.read()

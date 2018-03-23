@@ -1,8 +1,8 @@
 import asyncio
+from collections import deque
 
 from aio_pyorient import ODBClient
 from aio_pyorient.utils import AsyncCtx
-
 
 class ODBPool(AsyncCtx):
     def __init__(self,
@@ -70,16 +70,12 @@ class ODBPool(AsyncCtx):
     async def _watch_client(self, client):
         try:
             await client._is_ready.wait()
-            not_full = self._client_count<=self._max
-            to_low = self._client_count<=self._min
-            no_clients_available = self.available_clients<=0
-            needs_client = to_low or no_clients_available
-            if not self.cancelled and not_full and needs_client:
+            if not self.cancelled and self._client_count<=self._max:
                 self._clients.put_nowait(client)
+                self._is_ready.set()
             else:
                 await client.shutdown()
                 self._client_count -= 1
-            self._is_ready.set()
         except Exception as e:
             pass
 

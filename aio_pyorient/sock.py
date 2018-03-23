@@ -49,8 +49,7 @@ class ODBSocket(AsyncCtx):
     async def shutdown(self):
         self._cancelled.set()
         self._is_ready.clear()
-        if self._writer is not None:
-            self._writer.close()
+        self._writer.close()
         self._reader.set_exception(asyncio.CancelledError())
         self._host = ""
         self._port = 0
@@ -63,9 +62,7 @@ class ODBSocket(AsyncCtx):
         self._sent.set()
         return len(buff)
 
-    async def recv(self, _len_to_read: bool=True):
+    async def recv(self, _len_to_read):
         await self._sent.wait()
-        if _len_to_read is True:
-            buf = await self._reader.readexactly(_len_to_read)
-            return buf
-        return await self._reader.read()
+        buf = await self._reader.readexactly(_len_to_read)
+        return buf

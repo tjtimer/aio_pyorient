@@ -1,8 +1,10 @@
 import asyncio
 import struct
 
-from aio_pyorient.exceptions import ODBRequestErrorMessage
-from aio_pyorient.utils import AsyncBase, Signal
+from aio_pyorient.odb_types import (
+    ODBRequestErrorMessage
+)
+from aio_pyorient.utils import AsyncBase, ODBSignal
 
 
 NAME = "ODB binary client (aio_pyorient)"
@@ -69,10 +71,10 @@ class BaseHandler(AsyncBase):
             field_type(value)
             for field_type, value in fields
         )
-        self.on_will_send = Signal(self, ows_extra_payload)
-        self.on_will_read = Signal(self, ods_extra_payload)
-        self.on_did_send = Signal(self, owr_extra_payload)
-        self.on_did_read = Signal(self, odr_extra_payload)
+        self.on_will_send = ODBSignal(self, ows_extra_payload)
+        self.on_will_read = ODBSignal(self, ods_extra_payload)
+        self.on_did_send = ODBSignal(self, owr_extra_payload)
+        self.on_did_read = ODBSignal(self, odr_extra_payload)
         self._ows_disabled = no_ows
         self._ods_disabled = no_ods
         self._owr_disabled = no_owr
@@ -115,6 +117,31 @@ class BaseHandler(AsyncBase):
             decoded = value.decode("utf-8")
         return decoded
 
+    async def read(self):
+        if not self._owr_disabled:
+            await self.on_will_read.send(self)
+        try:
+            return await self._read()
+        except ODBHandlerError:
+            return await  self.read_error()
+        finally:
+            self._done.set()
+            self._client._is_ready.set()
+            if not self._odr_disabled:
+                await self.on_did_read.send(self)
+
+    async def send(self):
+        self._client._is_ready.clear()
+        if not self._ows_disabled:
+            await self.on_will_send.send(self)
+        try:
+            await self._sock.send(self._request)
+            self._sent.set()
+            return self
+        finally:
+            if not self._ods_disabled:
+                await self.on_did_send.send(self)
+
     async def read_header(self, with_token: bool = True):
         await self._sent.wait()
         status = await self.read_byte()
@@ -141,31 +168,6 @@ class BaseHandler(AsyncBase):
             ))
         self._done.set()
         return messages
-
-    async def read(self):
-        if not self._owr_disabled:
-            await self.on_will_read.send(self)
-        try:
-            return await self._read()
-        except ODBHandlerError:
-            return await  self.read_error()
-        finally:
-            self._done.set()
-            self._client._is_ready.set()
-            if not self._odr_disabled:
-                await self.on_did_read.send(self)
-
-    async def send(self):
-        self._client._is_ready.clear()
-        if not self._ows_disabled:
-            await self.on_will_send.send(self)
-        try:
-            await self._sock.send(self._request)
-            self._sent.set()
-            return self
-        finally:
-            if not self._ods_disabled:
-                await self.on_did_send.send(self)
 
     async def _read(self):
         """
