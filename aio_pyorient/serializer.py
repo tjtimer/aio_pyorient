@@ -2,7 +2,11 @@
 
  serializer
 """
+import io
 import re
+
+from aio_pyorient.handler.base import int_packer
+
 
 TYPE_MAP = {
     '1': 'Boolean',
@@ -29,7 +33,7 @@ StringList = lambda v: [val.replace('"', '') for val in List(v)]
 Type = lambda v: TYPE_MAP[v]
 
 key_reg = re.compile(r',?@?[a-zA-Z]+:')
-def serialize(data: str, specs: dict)->dict:
+def csv_serialize(data: str, specs: dict)->dict:
     data.replace('"', '')
     matches = list(key_reg.finditer(data))
     key_count = len(matches)
@@ -52,3 +56,18 @@ def serialize(data: str, specs: dict)->dict:
         except KeyError:
             values.append(value)
     return dict(zip(keys, values))
+
+
+
+def binary_serialize(data, result: dict={}):
+    buffer = io.BytesIO(data)
+    offset = 0
+    length = int(ord(data[offset]))
+    offset += 1
+    end = offset+length
+    class_name = data[offset:end].encode()
+    offset = end
+    end = offset + 4
+    position = int_packer.unpack('>i', data[offset:end])
+    offset = offset + end
+    data_type = int(ord(data[offset]))

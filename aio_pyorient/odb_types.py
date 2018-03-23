@@ -1,11 +1,11 @@
 from collections import namedtuple
 
-from aio_pyorient.serializer import serialize, Boolean, Integer, List, String, Float, Type, IntegerList, StringList
+from aio_pyorient.serializer import csv_serialize, Boolean, Integer, List, String, Float, Type, IntegerList, StringList
 
 
 ODBRecord = namedtuple("ODBRecord", "type, id, version, data")
 ODBCluster = namedtuple('ODBCluster', 'name, id')
-ODBRequestErrorMessage = namedtuple("ODBException", "class_name, message")
+
 
 class ODBClusters(list):
 
@@ -64,10 +64,10 @@ class ODBSchema:
                 props_end = d_string.find(')>')
                 p_string = d_string[props_start + 1:props_end]
                 props = [
-                    serialize(_p, PROPS_SPECS) for _p in p_string.split('),(')
+                    csv_serialize(_p, PROPS_SPECS) for _p in p_string.split('),(')
                 ]
                 d_string = d_string[0:props_start] + d_string[props_end+1:]
-            data = serialize(d_string, SCHEMA_SPECS)
+            data = csv_serialize(d_string, SCHEMA_SPECS)
             data['properties'] = {prop['name']: prop for prop in props}
             self._classes[data['name']] = data
 

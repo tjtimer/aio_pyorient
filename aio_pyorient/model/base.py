@@ -13,36 +13,30 @@ edge_registry = []
 
 class CommandBuilder:
 
-    @staticmethod
-    async def props_cmd(cls, alter_or_create: str='alter'):
+    @classmethod
+    def _props(cls):
+        return {k: v for k, v in cls.__dict__.items()
+                if isinstance(v, PropType)}
 
-        def props(cls):
-            return ((k, v) for k, v in cls.__dict__.items() if isinstance(k, PropType))
+    @classmethod
+    def prop_cmds(cls, alter_or_create: str='alter'):
 
-        def add_attr_definition(**attributes):
-            attr_command = ', '.join([
-                f"{attr_name} {attr_value}"
-                for attr_name, attr_value in attributes
-            ])
-            return f' ({attr_command})'
-
-        for name, prop_type in props(cls):
-            prop_command = f"""
-            {alter_or_create.upper()} PROPERTY
-            {cls.__name__}.{name} {prop_type.__class__.__name__}
-            """.strip().replace('\n', '')
-            prop_command += add_attr_definition(**prop_type.__dict__)
-            yield prop_command
+        for name, prop_type in cls._props().items():
+            definition = f"{cls.__name__}.{name} {prop_type}"
+            yield f"{alter_or_create.upper()} PROPERTY {definition}"
 
 
 class ODBVertex(CommandBuilder):
     def __init_subclass__(cls):
         vertex_registry.append(cls)
 
+    @property
+    def props(self):
+        return self._props()
 
 class ODBEdge(CommandBuilder):
     def __init_subclass__(cls):
-        edge_registry.append(f"CREATE CLASS {cls.__name__} EXTENDS E")
+        edge_registry.append(cls)
         InitCommands.append(
             f"CREATE PROPERTY {cls.__name__}.label (MANDATORY True)"
         )

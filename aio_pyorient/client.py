@@ -22,7 +22,8 @@ class ODBClient(AsyncCtx):
     Use this to talk to your OrientDB server.
 
     """
-    _serialization_type = "ORecordDocument2csv"
+    _serialization_type = "ORecordDocument2csv"  #
+    # _serialization_type = "ORecordSerializerBinary"
     def __init__(self,
                  host: str = 'localhost',
                  port: int = 2424,
@@ -43,6 +44,7 @@ class ODBClient(AsyncCtx):
         self._server_version = server_version
         self._session_id = session_id
         self._protocol = None
+        self._watcher = {}
         self._is_ready.set()
 
     @property
@@ -62,7 +64,7 @@ class ODBClient(AsyncCtx):
         return self._auth_token
 
     @property
-    def db_opened(self):
+    def active_db(self):
         return self._db_name
 
     @property
@@ -76,6 +78,10 @@ class ODBClient(AsyncCtx):
     @property
     def server_version(self):
         return self._server_version
+
+    @property
+    def watcher(self):
+        return self._watcher
 
     async def _shutdown(self):
         await self._sock.shutdown()
@@ -114,6 +120,11 @@ class ODBClient(AsyncCtx):
 
     async def get_schema(self):
         handler = await command.Query(self, SCHEMA_QUERY).send()
+        result = await handler.read()
+        return ODBSchema(result)
+
+    async def watch_schema(self):
+        handler = await command.Query(self, "LIVE SELECT FROM '0:1").send()
         result = await handler.read()
         return ODBSchema(result)
 

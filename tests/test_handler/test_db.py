@@ -1,7 +1,6 @@
 from pprint import pprint
 
 from aio_pyorient.handler import db
-from aio_pyorient.utils import ODBSignalPayload
 from tests.test_settings import TEST_DB, TEST_DB_PASSWORD, TEST_USER
 
 
@@ -9,7 +8,6 @@ signals_received = 0
 
 async def test_db_open(client):
     async def increment_i(payload):
-        assert isinstance(payload, ODBSignalPayload)
         global signals_received
         assert isinstance(payload.sender, db.OpenDb)
         if signals_received is 0:
@@ -42,7 +40,7 @@ async def test_db_open(client):
     assert signals_received is 4  # will_send, did_send, will_read, did_read
     assert client.session_id is not -1
     assert client.auth_token not in (b'', None)
-    assert client.db_opened == TEST_DB
+    assert client.active_db == TEST_DB
     assert len(client.clusters) > 0
     for cluster in client.clusters:
         assert cluster.id >= 0

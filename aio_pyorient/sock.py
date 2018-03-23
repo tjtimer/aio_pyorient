@@ -62,7 +62,9 @@ class ODBSocket(AsyncCtx):
         self._sent.set()
         return len(buff)
 
-    async def recv(self, _len_to_read):
+    async def recv(self, _len_to_read: bool=True):
         await self._sent.wait()
-        buf = await self._reader.readexactly(_len_to_read)
-        return buf
+        if _len_to_read is True:
+            buf = await self._reader.readexactly(_len_to_read)
+            return buf
+        return await self._reader.read()
