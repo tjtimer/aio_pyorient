@@ -52,7 +52,7 @@ class ODBClient(AsyncCtx):
         return self._auth_token
 
     @property
-    def db_opened(self):
+    def active_db(self):
         return self._db_name
 
     @property

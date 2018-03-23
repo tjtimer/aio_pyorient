@@ -13,15 +13,15 @@ class ODBClusters(list):
         is_id = isinstance(prop, int)
         attr_type = 'id' if is_id else 'name'
         try:
-            cluster = [cl for cl in self if prop in cl][0]
+            clusters = [cl for cl in self if prop in cl]
         except IndexError:
             raise ValueError(
                 f"cluster with {attr_type} {prop} does not exist"
             )
         else:
             if is_id:
-                return cluster.name
-            return cluster.id
+                return [cluster.name for cluster in clusters]
+            return [cluster.id for cluster in clusters]
 
 SCHEMA_SPECS = {
     'abstract': Boolean,

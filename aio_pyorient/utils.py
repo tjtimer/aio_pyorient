@@ -24,7 +24,7 @@ class ODBSignal:
     def payload(self):
         return ODBSignalPayload(self._sender, self._extra)
 
-    def __call__(self, coros):
+    def __call__(self, *coros):
         assert all([is_coro(c) for c in coros])
         self._receiver += coros
 
