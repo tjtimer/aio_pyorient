@@ -49,7 +49,8 @@ class ODBSocket(AsyncCtx):
     async def shutdown(self):
         self._cancelled.set()
         self._is_ready.clear()
-        self._writer.close()
+        if self._writer is not None:
+            self._writer.close()
         self._reader.set_exception(asyncio.CancelledError())
         self._host = ""
         self._port = 0

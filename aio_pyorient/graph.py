@@ -19,6 +19,10 @@ class ODBGraph(AsyncCtx):
 
     @property
     def schema(self):
+        return self._schema
+
+    @property
+    def classes(self):
         if self._schema is None:
             return None
         return self._schema.classes
