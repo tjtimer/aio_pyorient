@@ -78,6 +78,10 @@ class ODBClient(AsyncCtx):
         handler = await db.CreateDb(self, db_name, storage_type, **kwargs).send()
         return await handler.read()
 
+    async def drop_db(self, db_name: str, storage_type: str, **kwargs):
+        handler = await db.DropDb(self, db_name, storage_type, **kwargs).send()
+        return await handler.read()
+
     async def open_db(self, db_name: str, user: str, password: str, **kwargs):
         handler = await db.OpenDb(self, db_name, user, password, **kwargs).send()
         return await handler.read()

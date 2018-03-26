@@ -24,12 +24,7 @@ async def test_select_command(db_client):
     for item in response:
         print(item)
     assert handler.done
-"""
-@given(
-    name=st.text(alphabet=string.ascii_letters, min_size=3, max_size=20),
-    age=st.integers(min_value=10, max_value=150))
-"""
-# def test_create_(name, age, db_client):
+
 async def test_create_command(db_client):
     name = st.text(alphabet=[*string.ascii_lowercase, *string.ascii_uppercase], min_size=3, max_size=25).example()
     age = st.integers(min_value=2, max_value=120).example()
