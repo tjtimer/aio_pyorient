@@ -17,16 +17,21 @@ TYPE_MAP = {
     '10': 'Char',
     '11': 'Link'
 }
-int_reg = re.compile(r'-?\d*')
-Key = lambda v: v.replace(',', '').replace(':', '').replace('@', '')
+float_reg = re.compile(r'-?[0-9]+\.?[0-9]*')
+int_reg = re.compile(r'-?[0-9]+')
+str_reg = re.compile(r'[a-zA-Z]+')
+Key = lambda v: str_reg.search(v).group(0)
 String = lambda v: v[1:-1] if len(v) > 1 else v
-Integer = lambda v: int(v.replace('"', '')) if len(v) > 0 else None
+Integer = lambda v: int(int_reg.search(v).group(0)) if len(v) else None
 Float = lambda v: float(v[:-1])
 Boolean = lambda v: True if v.upper() == 'TRUE' else False
 List = lambda v: v[1:-1].split(', ') if len(v) > 1 else []
+FloatList = lambda v: list(float(x) for x in float_reg.findall(v))
+IntegerList = lambda v: list(int(x) for x in int_reg.findall(v))
+StringList = lambda v: list(x for x in str_reg.findall(v))
 Type = lambda v: TYPE_MAP[v]
 
-key_reg = re.compile(r',?@?[a-zA-Z]+:')
+key_reg = re.compile(r',?@?[a-zA-Z0-9_\-]+:')
 def serialize(data: str, specs: dict)->dict:
     data.replace('"', '')
     matches = list(key_reg.finditer(data))
