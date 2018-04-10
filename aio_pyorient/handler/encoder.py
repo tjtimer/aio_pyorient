@@ -22,7 +22,7 @@ Short = lambda v: short_packer.pack(v)
 Long = lambda v: long_packer.pack(v)
 
 RecordId = lambda v: b''.join([Short(int(v.split(':')[0][1:])),
-                              Long.encode(v.split(':')[1])])
+                              Long(v.split(':')[1])])
 
 Record = lambda v: b''.join([Byte(v.type.encode("utf-8")),
                             RecordId(v.id),

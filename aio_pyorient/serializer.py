@@ -3,32 +3,27 @@
  serializer
 """
 import re
+from .model.prop_types import TYPE_MAP
 
-TYPE_MAP = {
-    '1': 'Boolean',
-    '2': 'Byte',
-    '3': 'Short',
-    '4': 'Integer',
-    '5': 'Long',
-    '6': 'Bytes',
-    '7': 'String',
-    '8': 'Record',
-    '9': 'Strings',
-    '10': 'Char',
-    '11': 'Link'
-}
-int_reg = re.compile(r'-?\d*')
-Key = lambda v: v.replace(',', '').replace(':', '').replace('@', '')
+
+key_reg = re.compile(r',?@?[a-zA-Z0-9_\-]+:')
+float_reg = re.compile(r'-?[0-9]+\.?[0-9]*')
+int_reg = re.compile(r'-?[0-9]+')
+str_reg = re.compile(r'[a-zA-Z]+')
+
+Key = lambda v: str_reg.search(v).group(0)
 String = lambda v: v[1:-1] if len(v) > 1 else v
-Integer = lambda v: int(v.replace('"', '')) if len(v) > 0 else None
+Integer = lambda v: int(int_reg.search(v).group(0)) if len(v) else None
 Float = lambda v: float(v[:-1])
 Boolean = lambda v: True if v.upper() == 'TRUE' else False
 List = lambda v: v[1:-1].split(', ') if len(v) > 1 else []
-Type = lambda v: TYPE_MAP[v]
+FloatList = lambda v: list(float(x) for x in float_reg.findall(v))
+IntegerList = lambda v: list(int(x) for x in int_reg.findall(v))
+StringList = lambda v: list(x for x in str_reg.findall(v))
+Type = lambda v: TYPE_MAP[int(v)]
 
-key_reg = re.compile(r',?@?[a-zA-Z]+:')
+
 def serialize(data: str, specs: dict)->dict:
-    data.replace('"', '')
     matches = list(key_reg.finditer(data))
     key_count = len(matches)
     keys = []
@@ -50,3 +45,18 @@ def serialize(data: str, specs: dict)->dict:
         except KeyError:
             values.append(value)
     return dict(zip(keys, values))
+
+def var_int(stream):
+    result = 0
+    shift = 0
+    while True:
+        raw = ord(stream.read(1))
+        last = (raw & 0x80) is 0
+        if shift is 0:
+            result |= raw >> 1
+        else:
+            result |= (raw & 0x7f) << shift
+        if last is True:
+            break
+        shift += 7
+    return result

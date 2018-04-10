@@ -1,11 +1,33 @@
+import io
 from collections import namedtuple
 
 from aio_pyorient.serializer import serialize, Boolean, Integer, List, String, Float, Type
 
-
-ODBRecord = namedtuple("ODBRecord", "type, id, version, data")
 ODBCluster = namedtuple('ODBCluster', 'name, id')
 ODBRequestErrorMessage = namedtuple("ODBException", "class_name, message")
+
+class ODBRecordData(io.BytesIO):
+
+    def __init__(self, initial: bytes=None):
+        super().__init__(initial)
+
+    @property
+    def size(self):
+        return self.__sizeof__()
+
+    def decode(self):
+        return self.getvalue().decode()
+
+class ODBRecord:
+    def __init__(self, type, id, version, data):
+        self.type = type
+        self.id = id
+        self.version = version
+        self.data = ODBRecordData(data)
+
+    def __repr__(self):
+        return f'<ODBRecord id={self.id} version={self.version} {self.data.size}>'
+
 
 class ODBClusters(list):
 

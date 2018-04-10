@@ -11,10 +11,5 @@ setup(
     license='LICENSE',
     packages = [
         'aio_pyorient',
-    ],
-    install_requires=[
-        'arrow',
-        'pytest',
-        'pytest-aiohttp'
     ]
 )

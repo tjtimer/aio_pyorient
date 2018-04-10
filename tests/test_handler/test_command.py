@@ -8,16 +8,10 @@ from hypothesis import strategies as st
 from aio_pyorient.handler.command import Query
 
 async def test_select_command(db_client):
-    handler = Query(
-        db_client,
-        """select from #0:1"""
-    )
-    await handler.send()
-    response = await handler.read()
+    response = await db_client.execute("select globalproperties from #0:1")
     print("response:")
     for item in response:
         print(item)
-    assert handler.done
 
 async def test_create_command(db_client):
     name = st.text(

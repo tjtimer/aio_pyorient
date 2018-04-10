@@ -1,6 +1,8 @@
 import asyncio
 
 from aio_pyorient.handler import db, server, command
+from aio_pyorient.handler.base import int_packer
+from aio_pyorient.model.prop_types import TYPE_MAP
 from aio_pyorient.odb_types import ODBClusters
 from aio_pyorient.sock import ODBSocket
 from aio_pyorient.utils import AsyncCtx
@@ -20,19 +22,30 @@ class ODBClient(AsyncCtx):
 
     """
     def __init__(self,
+                 client_id: str='',
+                 session_id: int=-1,
+                 auth_token: bytes = b'',
+                 db_name: str=None,
+                 clusters: ODBClusters=ODBClusters(),
+                 cluster_conf: bytes=b'',
+                 server_version: str= '',
+                 protocol: int=None,
+                 serialization_type="ORecordDocument2csv",
                  host: str = 'localhost',
                  port: int = 2424, **kwargs):
         super().__init__(**kwargs)
         self._sock = ODBSocket(host=host, port=port, loop=self._loop)
-        self._id = kwargs.pop('client_id', '')
-        self._session_id = kwargs.pop("session_id", -1)
-        self._auth_token = kwargs.pop("auth_token", b'')
-        self._db_name = kwargs.pop("db_name", '')
-        self._clusters = kwargs.pop("clusters", ODBClusters())
-        self._cluster_conf = kwargs.pop("cluster_conf", b'')
-        self._server_version = kwargs.pop("server_version", '')
-        self._protocol = None
-        self._serialization_type = "ORecordDocument2csv"
+        self._id = client_id
+        self._session_id = session_id
+        self._auth_token = auth_token
+        self._db_name = db_name
+        self._clusters = clusters
+        self._cluster_conf = cluster_conf
+        self._server_version = server_version
+        self._protocol = protocol
+
+        # "ORecordSerializerBinary" or "ORecordDocument2csv"
+        self._serialization_type = serialization_type
         self._is_ready.set()
 
     @property
@@ -105,3 +118,37 @@ class ODBClient(AsyncCtx):
     async def execute(self, query: str, **kwargs):
         handler = await command.Query(self, query, **kwargs).send()
         return await handler.read()
+
+    async def get_global_props(self):
+        response = await self.execute("select globalProperties from #0:1")
+        result = []
+        rest = None
+        for record in response:
+            raw = record.data
+            print(raw)
+            raw.read(2)
+            i = 0
+            cur = 2
+            while True:
+                next_b = raw.read(1)
+                cur += 1
+                if next_b == b'':
+                    break
+                num_val = ord(next_b)  >> 1
+                if num_val is 0:
+                    rest = raw.getvalue()[cur:]
+                    break
+                name = raw.read(num_val)
+                cur += num_val
+                position = int_packer.unpack(raw.read(4))[0]
+                data_type = TYPE_MAP[ord(raw.read(1))]
+                data_def = (name, position, data_type)
+                cur += 5
+                print(f'{i}: {data_def}')
+                i += 1
+                result.append(data_def)
+        print('result')
+        print(result)
+        print('rest')
+        print(rest)
+        return result, rest

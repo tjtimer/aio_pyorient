@@ -177,6 +177,6 @@ class BaseHandler(AsyncBase):
         pass
 
 
-int_packer = struct.Struct("!i")
-short_packer = struct.Struct("!h")
-long_packer = struct.Struct("!q")
+int_packer = struct.Struct(">i")
+short_packer = struct.Struct(">h")
+long_packer = struct.Struct(">q")
