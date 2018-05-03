@@ -34,7 +34,7 @@ class ODBPool(AsyncCtx):
         return self._clients.qsize()
 
     @property
-    def clients(self):
+    def size(self):
         return self._client_count
 
     async def acquire(self):
@@ -50,7 +50,7 @@ class ODBPool(AsyncCtx):
                 self.spawn(self._add_client())
 
     async def _add_client(self):
-        if self.cancelled or self.clients >= self._max:
+        if self.cancelled or self.size >= self._max:
             return
         client = ODBClient(**self._kwargs)
         if self._db_name is None:

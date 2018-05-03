@@ -1,5 +1,5 @@
-from aio_pyorient.handler.base import BaseHandler
-from aio_pyorient.handler.encoder import Boolean, String, Introduction, RequestHeader
+from aio_pyorient.message.base import BaseHandler
+from aio_pyorient.message.encoder import Boolean, String, Introduction, RequestHeader
 
 
 class ServerConnect(BaseHandler):
@@ -25,6 +25,7 @@ class ServerConnect(BaseHandler):
         )
 
     async def _read(self):
+        print('ServerConnect starts reading.')
         await self.read_header(with_token=False)  # returns status, old session_id, empty byte
         self._client._session_id = await self.read_int()
         self._client._auth_token = await self.read_bytes()

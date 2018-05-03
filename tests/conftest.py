@@ -1,12 +1,13 @@
 import pytest
 
 from aio_pyorient import ODBClient
-from .test_settings import TEST_DB, TEST_DB_PASSWORD, TEST_USER
+from .test_settings import TEST_DB, TEST_DB_PASSWORD, TEST_USER, TEST_PASSWORD
 
 
 @pytest.fixture(scope="function")
 async def client(loop):
     async with ODBClient("localhost", 2424, loop=loop) as client:
+        await client.connect(TEST_USER, TEST_PASSWORD)
         yield client
 
 @pytest.fixture(scope="function")

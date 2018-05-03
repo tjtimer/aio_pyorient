@@ -1,6 +1,6 @@
 from pprint import pprint
 
-from aio_pyorient.handler import db
+from aio_pyorient.message import db
 from aio_pyorient.utils import ODBSignalPayload
 from tests.test_settings import TEST_DB, TEST_DB_PASSWORD, TEST_USER
 
@@ -22,24 +22,15 @@ async def test_db_open(client):
         return signals_received
 
     handler = db.OpenDb(client,
-                        TEST_DB, TEST_USER, TEST_DB_PASSWORD,
-                        ows_extra_payload='_ows_',
-                        odr_extra_payload='_odr_'
+                        TEST_DB, TEST_USER, TEST_DB_PASSWORD
                         )
-    handler.on_will_send(increment_i)
-    handler.on_did_send(increment_i)
-    handler.on_will_read(increment_i)
-    handler.on_did_read(increment_i)
     assert handler._sent.is_set() is False
     assert handler.done is False
-    assert signals_received is 0
     await handler.send()
     assert handler._sent.is_set() is True
     assert handler.done is False
-    assert signals_received is 2  # will_send, did_send
     await handler.read()
     assert handler.done is True
-    assert signals_received is 4  # will_send, did_send, will_read, did_read
     assert client.session_id is not -1
     assert client.auth_token not in (b'', None)
     assert client.db_opened == TEST_DB
@@ -48,7 +39,7 @@ async def test_db_open(client):
         assert cluster.id >= 0
         assert isinstance(cluster.name, str)
         assert cluster.name != ""
-    assert client.clusters.get('internal') == 0
-    assert client.clusters.get(0) == 'internal'
+    assert 0 in client.clusters.get('internal')
+    assert 'internal' in client.clusters.get(0)
     assert client.server_version is not None
     pprint(vars(client))

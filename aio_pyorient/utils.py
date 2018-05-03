@@ -1,12 +1,8 @@
 import asyncio
 import concurrent.futures
 import functools
-import inspect
 import typing
 from collections import namedtuple
-
-import arrow as arrow
-
 
 ODBSignalPayload = namedtuple('ODBSignalPayload', 'sender, extra')
 

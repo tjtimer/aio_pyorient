@@ -1,8 +1,9 @@
 import asyncio
+from pprint import pprint
 
-from aio_pyorient.handler import db, server, command
-from aio_pyorient.handler.base import int_packer
-from aio_pyorient.model.prop_types import TYPE_MAP
+from aio_pyorient.message import db, server, command
+from aio_pyorient.message.base import int_packer
+from aio_pyorient.schema.prop_types import TYPE_MAP, var_int
 from aio_pyorient.odb_types import ODBClusters
 from aio_pyorient.sock import ODBSocket
 from aio_pyorient.utils import AsyncCtx
@@ -34,7 +35,7 @@ class ODBClient(AsyncCtx):
                  host: str = 'localhost',
                  port: int = 2424, **kwargs):
         super().__init__(**kwargs)
-        self._sock = ODBSocket(host=host, port=port, loop=self._loop)
+        self._sock = ODBSocket(host=host, port=port)
         self._id = client_id
         self._session_id = session_id
         self._auth_token = auth_token
@@ -84,11 +85,16 @@ class ODBClient(AsyncCtx):
         await self._sock.shutdown()
 
     async def connect(self, user: str, password: str, **kwargs):
-        handler = await server.ServerConnect(self, user, password, **kwargs).send()
+        handler = server.ServerConnect(self, user, password, **kwargs)
+        print('connect handler')
+        pprint(vars(handler))
+        await handler.send()
         return await handler.read()
 
-    async def create_db(self, db_name: str, storage_type: str, **kwargs):
-        handler = await db.CreateDb(self, db_name, storage_type, **kwargs).send()
+    async def create_db(self, db_name: str, *, db_type: str='graph', storage_type: str='plocal', **kwargs):
+        handler = db.CreateDb(self, db_name,
+                              db_type=db_type, storage_type=storage_type, **kwargs)
+        await handler.send()
         return await handler.read()
 
     async def open_db(self, db_name: str, user: str, password: str, **kwargs):
@@ -103,8 +109,8 @@ class ODBClient(AsyncCtx):
         handler = await db.CloseDb(self, **kwargs).send()
         return await handler.read()
 
-    async def db_exist(self, db_name: str, storage_type: str, **kwargs):
-        handler = await db.DbExist(self, db_name, storage_type, **kwargs).send()
+    async def db_exist(self, db_name: str, *, storage_type: str='plocal', **kwargs):
+        handler = await db.DbExist(self, db_name, storage_type=storage_type, **kwargs).send()
         return await handler.read()
 
     async def db_size(self, **kwargs):
@@ -115,40 +121,10 @@ class ODBClient(AsyncCtx):
         handler = await db.DbRecordCount(self, **kwargs).send()
         return await handler.read()
 
+    async def db_schema(self):
+        response = await self.execute("select from #0:1")
+        return response
+
     async def execute(self, query: str, **kwargs):
         handler = await command.Query(self, query, **kwargs).send()
-        return await handler.read()
-
-    async def get_global_props(self):
-        response = await self.execute("select globalProperties from #0:1")
-        result = []
-        rest = None
-        for record in response:
-            raw = record.data
-            print(raw)
-            raw.read(2)
-            i = 0
-            cur = 2
-            while True:
-                next_b = raw.read(1)
-                cur += 1
-                if next_b == b'':
-                    break
-                num_val = ord(next_b)  >> 1
-                if num_val is 0:
-                    rest = raw.getvalue()[cur:]
-                    break
-                name = raw.read(num_val)
-                cur += num_val
-                position = int_packer.unpack(raw.read(4))[0]
-                data_type = TYPE_MAP[ord(raw.read(1))]
-                data_def = (name, position, data_type)
-                cur += 5
-                print(f'{i}: {data_def}')
-                i += 1
-                result.append(data_def)
-        print('result')
-        print(result)
-        print('rest')
-        print(rest)
-        return result, rest
+        return (rec for rec in await handler.read())

@@ -4,7 +4,7 @@
 """
 from pprint import pprint
 
-from aio_pyorient.handler.command import Query
+from aio_pyorient.message.command import Query
 from aio_pyorient.odb_types import ODBSchema
 from aio_pyorient.pool import ODBPool
 from aio_pyorient.utils import AsyncCtx
@@ -21,7 +21,7 @@ class ODBGraph(AsyncCtx):
 
     @property
     def pool_size(self):
-        return self._pool.clients
+        return self._pool.size
 
     @property
     def schema(self):

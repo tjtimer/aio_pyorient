@@ -5,13 +5,14 @@
 import string
 
 from hypothesis import strategies as st
-from aio_pyorient.handler.command import Query
+from aio_pyorient.message.command import Query
 
-async def test_select_command(db_client):
-    response = await db_client.execute("select globalproperties from #0:1")
+async def test_select_command(binary_db_client):
+    response = await binary_db_client.execute("select from Person")
     print("response:")
     for item in response:
         print(item)
+        print(item.data.getvalue())
 
 async def test_create_command(db_client):
     name = st.text(

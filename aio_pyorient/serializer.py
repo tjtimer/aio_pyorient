@@ -3,7 +3,8 @@
  serializer
 """
 import re
-from .model.prop_types import TYPE_MAP
+
+from .schema.prop_types import TYPE_MAP
 
 
 key_reg = re.compile(r',?@?[a-zA-Z0-9_\-]+:')
@@ -46,17 +47,3 @@ def serialize(data: str, specs: dict)->dict:
             values.append(value)
     return dict(zip(keys, values))
 
-def var_int(stream):
-    result = 0
-    shift = 0
-    while True:
-        raw = ord(stream.read(1))
-        last = (raw & 0x80) is 0
-        if shift is 0:
-            result |= raw >> 1
-        else:
-            result |= (raw & 0x7f) << shift
-        if last is True:
-            break
-        shift += 7
-    return result

@@ -1,7 +1,8 @@
 import io
 from collections import namedtuple
 
-from aio_pyorient.serializer import serialize, Boolean, Integer, List, String, Float, Type
+from aio_pyorient.serializer import serialize, Boolean, Integer, List, String, Float, Type, StringList, IntegerList
+
 
 ODBCluster = namedtuple('ODBCluster', 'name, id')
 ODBRequestErrorMessage = namedtuple("ODBException", "class_name, message")
@@ -18,6 +19,9 @@ class ODBRecordData(io.BytesIO):
     def decode(self):
         return self.getvalue().decode()
 
+    def __repr__(self):
+        return f"<ODBRecordData size {self.size} {self.getvalue()[:8]}...>"
+
 class ODBRecord:
     def __init__(self, type, id, version, data):
         self.type = type
@@ -31,23 +35,20 @@ class ODBRecord:
 
 class ODBClusters(list):
 
-    def get(self, prop: int or str)->str or int:
-        is_id = isinstance(prop, int)
-        attr_type = 'id' if is_id else 'name'
+    def get(self, val: int or str)->list:
+        is_id = isinstance(val, int)
         try:
-            cluster = [cl for cl in self if prop in cl][0]
+            if is_id:
+                return sorted([cl.name for cl in self if cl.id == val])
+            return sorted([cl.id for cl in self if val.lower() in cl.name])
         except IndexError:
             raise ValueError(
-                f"cluster with {attr_type} {prop} does not exist"
+                f"no cluster with {'id' if is_id else 'name'} {val}"
             )
-        else:
-            if is_id:
-                return cluster.name
-            return cluster.id
 
 SCHEMA_SPECS = {
     'abstract': Boolean,
-    'clusterIds': List,
+    'clusterIds': IntegerList,
     'clusterSelection': String,
     'customFields': String,
     'defaultClusterId': Integer,
@@ -58,10 +59,7 @@ SCHEMA_SPECS = {
     'shortName': String,
     'strictMode': Boolean,
     'superClass': String,
-    'superClasses': List,
-    'type': Type,
-    'notNull': Boolean,
-    'mandatory': Boolean
+    'superClasses': StringList
 }
 PROPS_SPECS = {
     'collate': String,

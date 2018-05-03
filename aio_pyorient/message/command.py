@@ -2,19 +2,12 @@ import asyncio
 import inspect
 from typing import Callable
 
-from aio_pyorient.handler.base import (
+from aio_pyorient.message.base import (
     BaseHandler
 )
+from aio_pyorient.message.constants import QUERY_ASYNC, QUERY_CMD
 from aio_pyorient.odb_types import ODBRecord
-from aio_pyorient.handler.encoder import Bytes, Char, String, Integer, RequestHeader
-
-
-QUERY_SYNC    = "com.orientechnologies.orient.core.sql.query.OSQLSynchQuery"
-QUERY_ASYNC   = "com.orientechnologies.orient.core.sql.query.OSQLAsynchQuery"
-QUERY_CMD     = "com.orientechnologies.orient.core.sql.OCommandSQL"
-QUERY_GREMLIN = "com.orientechnologies.orient.graph.gremlin.OCommandGremlin"
-QUERY_SCRIPT  = "com.orientechnologies.orient.core.command.script.OCommandScript"
-
+from aio_pyorient.message.encoder import Bytes, Char, String, Integer, RequestHeader
 
 
 class Query(BaseHandler):
@@ -23,7 +16,7 @@ class Query(BaseHandler):
     def __init__(self,
                  client,
                  query: str, *,
-                 command_type: str=QUERY_CMD,
+                 command_type: str= QUERY_CMD,
                  limit: int=25,
                  fetch_plan: str='*:0',
                  mode: str='s',

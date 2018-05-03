@@ -2,8 +2,8 @@
 
  encoder
 """
-from aio_pyorient.handler.base import int_packer, short_packer, long_packer, NAME, VERSION, SUPPORTED_PROTOCOL
-
+from aio_pyorient.message.base import int_packer, short_packer, long_packer
+from aio_pyorient.message.constants import NAME, VERSION, SUPPORTED_PROTOCOL
 
 Boolean = lambda v: bytes([1]) if v else bytes([0])
 
@@ -22,12 +22,12 @@ Short = lambda v: short_packer.pack(v)
 Long = lambda v: long_packer.pack(v)
 
 RecordId = lambda v: b''.join([Short(int(v.split(':')[0][1:])),
-                              Long(v.split(':')[1])])
+                               Long(v.split(':')[1])])
 
 Record = lambda v: b''.join([Byte(v.type.encode("utf-8")),
-                            RecordId(v.id),
-                            Integer(v.version),
-                            Bytes(v.content)])
+                             RecordId(v.id),
+                             Integer(v.version),
+                             Bytes(v.content)])
 
 Introduction = lambda v: String(NAME) + String(VERSION) + Short(SUPPORTED_PROTOCOL)
 

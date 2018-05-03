@@ -2,7 +2,7 @@
 
  test_server
 """
-from aio_pyorient.handler import server
+from aio_pyorient.message import server
 from tests.test_settings import  TEST_USER, TEST_PASSWORD
 
 

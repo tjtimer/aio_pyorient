@@ -2,7 +2,7 @@
 
  base
 """
-from aio_pyorient.model.prop_types import String, Integer, PropType
+from aio_pyorient.schema.prop_types import String, Integer, PropType
 from aio_pyorient.utils import AsyncCtx
 
 
@@ -12,12 +12,24 @@ edge_registry = []
 
 
 class CommandBuilder:
+    def __init_subclass__(cls, **kwargs):
+        cls._name = cls.__name__
 
-    @staticmethod
-    async def props_cmd(cls, alter_or_create: str='alter'):
+    @property
+    def props(self):
+        return {k: v
+                for k, v in self.__dict__.items()
+                if isinstance(k, PropType)}
 
-        def props(cls):
-            return ((k, v) for k, v in cls.__dict__.items() if isinstance(k, PropType))
+    @property
+    def create_props_cmd(self):
+        return list(self.props_cmd('create'))
+
+    @property
+    def alter_props_cmd(self):
+        return list(self.props_cmd())
+
+    def props_cmd(self, alter_or_create: str='alter'):
 
         def add_attr_definition(**attributes):
             attr_command = ', '.join([
@@ -26,10 +38,10 @@ class CommandBuilder:
             ])
             return f' ({attr_command})'
 
-        for name, prop_type in props(cls):
+        for name, prop_type in self.props:
             prop_command = f"""
             {alter_or_create.upper()} PROPERTY
-            {cls.__name__}.{name} {prop_type.__class__.__name__}
+            {self._name}.{name} {prop_type.__class__.__name__}
             """.strip().replace('\n', '')
             prop_command += add_attr_definition(**prop_type.__dict__)
             yield prop_command

@@ -1,9 +1,11 @@
+from pprint import pprint
+
 from aio_pyorient.odb_types import ODBCluster
 
-from aio_pyorient.handler.base import (
+from aio_pyorient.message.base import (
     BaseHandler
 )
-from aio_pyorient.handler.encoder import Boolean, String, Introduction, RequestHeader
+from aio_pyorient.message.encoder import Boolean, String, Introduction, RequestHeader
 
 
 class DbBaseHandler(BaseHandler):
@@ -72,9 +74,10 @@ class CreateDb(BaseHandler):
 
     def __init__(self,
                  client,
-                 db_name: str,
+                 db_name: str, *,
                  db_type: str="graph",
                  storage_type: str="plocal",
+                 restore_from: str='',
                  **kwargs):
         super().__init__(
             client,
@@ -82,8 +85,11 @@ class CreateDb(BaseHandler):
             (String, db_name),
             (String, db_type),
             (String, storage_type),
+            (String, restore_from),
             **kwargs
         )
+        print('CreateDb init')
+        pprint(vars(self))
 
     async def _read(self):
         await self.read_header()
@@ -105,15 +111,15 @@ class DropDb(BaseHandler):
         )
 
     async def _read(self):
-        await self.read_header()
+        # await self.read_header()
         return self._client
 
 class DbExist(BaseHandler):
 
     def __init__(self,
                  client,
-                 db_name: str,
-                 storage_type: str,
+                 db_name: str, *,
+                 storage_type: str='plocal',
                  **kwargs):
         super().__init__(
             client,
@@ -125,7 +131,8 @@ class DbExist(BaseHandler):
 
     async def _read(self):
         await self.read_header()
-        return await self.read_bool()
+        exist = await self.read_bool()
+        return exist
 
 class DbSize(BaseHandler):
 

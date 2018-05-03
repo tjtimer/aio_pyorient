@@ -1,7 +1,7 @@
 import asyncio
 import struct
 
-from aio_pyorient.handler.base import short_packer
+from aio_pyorient.message.base import short_packer
 from aio_pyorient.utils import AsyncCtx
 
 
@@ -13,7 +13,7 @@ class ODBSocket(AsyncCtx):
         super().__init__(**kwargs)
         self._host = host
         self._port = port
-        self._sent = asyncio.Event(loop=self._loop)
+        self._sent = asyncio.Event()
         self._reader, self._writer = None, None
         self._in_transaction = False
         self._props = None
@@ -37,6 +37,13 @@ class ODBSocket(AsyncCtx):
     def in_transaction(self):
         return self._in_transaction
 
+    async def read_bool(self):
+        return ord(await self.recv(1)) is 1
+
+    async def send_bool(self, data):
+        await self.send(bytes([1]) if data else bytes([0]))
+        return len(data)
+
     async def connect(self):
         self._reader, self._writer = await asyncio.open_connection(
             self._host, self._port, loop=self._loop
@@ -56,6 +63,8 @@ class ODBSocket(AsyncCtx):
         self._port = 0
 
     async def send(self, buff):
+        print('sock starts sending')
+        print(vars(self))
         await self._is_ready.wait()
         self._sent.clear()
         self._writer.write(buff)

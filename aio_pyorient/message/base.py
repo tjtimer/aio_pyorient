@@ -1,20 +1,11 @@
 import asyncio
 import struct
 
+from aio_pyorient.message.constants import REQUEST_ERROR, REQUEST_PUSH
 from aio_pyorient.odb_types import (
     ODBRequestErrorMessage
 )
-from aio_pyorient.utils import AsyncBase, ODBSignal
-
-
-NAME = "ODB binary client (aio_pyorient)"
-VERSION = "0.0.1"
-SUPPORTED_PROTOCOL = 37
-
-# response status
-REQUEST_SUCCESS = 0
-REQUEST_ERROR = 1
-REQUEST_PUSH = 3
+from aio_pyorient.utils import AsyncBase
 
 
 class ODBHandlerError(BaseException):
@@ -53,16 +44,7 @@ class BaseHandler(AsyncBase):
                 return response
     """
 
-    def __init__(self, client, *fields,
-                 ows_extra_payload=None,
-                 ods_extra_payload=None,
-                 owr_extra_payload=None,
-                 odr_extra_payload=None,
-                 no_ows=False,
-                 no_ods=False,
-                 no_owr=False,
-                 no_odr=False,
-                 **kwargs):
+    def __init__(self, client, *fields, **kwargs):
         super().__init__(loop=client._loop)
         self._sent = asyncio.Event(loop=self._loop)
         self._client = client
@@ -71,14 +53,6 @@ class BaseHandler(AsyncBase):
             field_type(value)
             for field_type, value in fields
         )
-        self.on_will_send = ODBSignal(self, ows_extra_payload)
-        self.on_will_read = ODBSignal(self, ods_extra_payload)
-        self.on_did_send = ODBSignal(self, owr_extra_payload)
-        self.on_did_read = ODBSignal(self, odr_extra_payload)
-        self._ows_disabled = no_ows
-        self._ods_disabled = no_ods
-        self._owr_disabled = no_owr
-        self._odr_disabled = no_odr
 
     async def read_bool(self):
         return ord(await self._sock.recv(1)) is 1
@@ -110,37 +84,8 @@ class BaseHandler(AsyncBase):
         return decoded
 
     async def read_string(self):
-        decoded = ""
-        _len = await self.read_int()
-        if _len > 0:
-            value = await self._sock.recv(_len)
-            decoded = value.decode("utf-8")
+        decoded = (await self.read_bytes()).decode("utf-8")
         return decoded
-
-    async def read(self):
-        if not self._owr_disabled:
-            await self.on_will_read.send(self)
-        try:
-            return await self._read()
-        except ODBHandlerError:
-            return await  self.read_error()
-        finally:
-            self._done.set()
-            self._client._is_ready.set()
-            if not self._odr_disabled:
-                await self.on_did_read.send(self)
-
-    async def send(self):
-        self._client._is_ready.clear()
-        if not self._ows_disabled:
-            await self.on_will_send.send(self)
-        try:
-            await self._sock.send(self._request)
-            self._sent.set()
-            return self
-        finally:
-            if not self._ods_disabled:
-                await self.on_did_send.send(self)
 
     async def read_header(self, with_token: bool = True):
         await self._sent.wait()
@@ -168,6 +113,22 @@ class BaseHandler(AsyncBase):
             ))
         self._done.set()
         return messages
+
+    async def read(self):
+        try:
+            return await self._read()
+        except ODBHandlerError:
+            return await  self.read_error()
+        finally:
+            self._done.set()
+
+    async def send(self):
+        try:
+            await self._sock.send(self._request)
+            return self
+        finally:
+            self._sent.set()
+
 
     async def _read(self):
         """
