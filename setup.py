@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='aio_pyorient',
@@ -9,7 +9,5 @@ setup(
     description='async OrientDB client library for python',
     long_description=open('README.rst').read(),
     license='LICENSE',
-    packages = [
-        'aio_pyorient',
-    ]
+    packages = find_packages()
 )

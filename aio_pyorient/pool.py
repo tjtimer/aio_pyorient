@@ -1,8 +1,8 @@
 import asyncio
-from collections import deque
 
-from aio_pyorient import ODBClient
+from aio_pyorient.client import ODBClient
 from aio_pyorient.utils import AsyncCtx
+
 
 class ODBPool(AsyncCtx):
     def __init__(self,

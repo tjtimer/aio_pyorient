@@ -111,7 +111,7 @@ class DropDb(BaseHandler):
         )
 
     async def _read(self):
-        # await self.read_header()
+        await self.read_header()
         return self._client
 
 class DbExist(BaseHandler):

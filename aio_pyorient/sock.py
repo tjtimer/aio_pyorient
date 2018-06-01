@@ -37,21 +37,24 @@ class ODBSocket(AsyncCtx):
     def in_transaction(self):
         return self._in_transaction
 
-    async def read_bool(self):
-        return ord(await self.recv(1)) is 1
-
-    async def send_bool(self, data):
-        await self.send(bytes([1]) if data else bytes([0]))
-        return len(data)
-
-    async def connect(self):
-        self._reader, self._writer = await asyncio.open_connection(
-            self._host, self._port, loop=self._loop
-        )
-        self._sent.set()
-        protocol = short_packer.unpack(await self._reader.readexactly(2))[0]
-        self._is_ready.set()
-        return protocol
+    async def connect(self, retry: int=0):
+        try:
+            self._reader, self._writer = await asyncio.open_connection(
+                self._host, self._port, loop=self._loop
+            )
+            self._sent.set()
+            raw = await self.wait_for(self._reader.read(2), timeout=1)
+            if len(raw) is 2:
+                protocol = short_packer.unpack(raw)[0]
+                self._is_ready.set()
+                return protocol
+            if retry >= 3:
+                raise RuntimeError('Could not connect to Oreintdb server.')
+            retry += 1
+            return await self.connect(retry)
+        except Exception as ex:
+            print(f"Exception at sock.connect\n"
+                  f"ex: {vars(ex)}")
 
     async def shutdown(self):
         self._cancelled.set()

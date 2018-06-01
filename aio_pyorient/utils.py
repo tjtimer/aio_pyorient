@@ -118,14 +118,18 @@ class AsyncBase:
         for n,t in self._tasks.items():
             for _task in t:
                 _task.cancel()
-            await self.wait_for(*t, timeout=0)
+            await self.wait_for(*[task for task in t if not task.done()], timeout=0)
 
     async def wait_for(self, *futs, rw=asyncio.ALL_COMPLETED, timeout=None):
         self._waiting.set()
         try:
+            if len(futs) is 0:
+                return
             if len(futs) is 1:
-                return await asyncio.wait_for(futs, timeout)
+                return await asyncio.wait_for(futs[0], timeout)
             else:
+                if timeout is None:
+                    return await asyncio.gather(*futs)
                 return await asyncio.wait(futs, timeout=timeout, return_when=rw)
         finally:
             self._waiting.clear()

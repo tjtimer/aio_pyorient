@@ -82,11 +82,13 @@ class EmbeddedList(PropType):
     def serialize(stream: BytesIO)->list:
         length = var_int(stream)
         item_type = TYPE_MAP[ord(stream.read(1))]
-        result = []
+        result = [item_type.serialize(stream) for _ in range(length)]
         return result
 
 class EmbeddedSet(PropType):
-    pass
+    @staticmethod
+    def serialize(stream: BytesIO)->set:
+        return set(EmbeddedList.serialize(stream))
 
 class Float(PropType):
     pass

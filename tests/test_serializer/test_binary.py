@@ -11,5 +11,5 @@ async def test_binary(binary_db_client):
             next_b = record.data.read(1)
             if next_b == b'':
                 break
-            print(f'{i}: {next_b}' )
+            print(f'{i}: {next_b} -> ord: {ord(next_b)}' )
             i += 1

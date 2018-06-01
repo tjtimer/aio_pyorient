@@ -27,7 +27,7 @@ class ODBClient(AsyncCtx):
                  session_id: int=-1,
                  auth_token: bytes = b'',
                  db_name: str=None,
-                 clusters: ODBClusters=ODBClusters(),
+                 clusters: ODBClusters=None,
                  cluster_conf: bytes=b'',
                  server_version: str= '',
                  protocol: int=None,
@@ -40,6 +40,8 @@ class ODBClient(AsyncCtx):
         self._session_id = session_id
         self._auth_token = auth_token
         self._db_name = db_name
+        if clusters is None or not isinstance(clusters, ODBClusters):
+            clusters = ODBClusters()
         self._clusters = clusters
         self._cluster_conf = cluster_conf
         self._server_version = server_version
@@ -127,4 +129,4 @@ class ODBClient(AsyncCtx):
 
     async def execute(self, query: str, **kwargs):
         handler = await command.Query(self, query, **kwargs).send()
-        return (rec for rec in await handler.read())
+        return await handler.read()

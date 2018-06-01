@@ -39,10 +39,10 @@ class CommandBuilder:
             return f' ({attr_command})'
 
         for name, prop_type in self.props:
-            prop_command = f"""
-            {alter_or_create.upper()} PROPERTY
-            {self._name}.{name} {prop_type.__class__.__name__}
-            """.strip().replace('\n', '')
+            prop_command = (
+                f"{alter_or_create.upper()} PROPERTY"
+                f"{self._name}.{name} {prop_type.__class__.__name__}"
+            )
             prop_command += add_attr_definition(**prop_type.__dict__)
             yield prop_command
 
